@@ -8,14 +8,31 @@ layout(std430, binding = 0) buffer PointBuffer
         vec4 points[];
 };
 
+layout(std430, binding = 1) readonly buffer MatrixBuffer
+{
+        mat4 IFSMatrices[];
+};
+
 uniform int pointCount;
-uniform float timeSeconds;
-uniform mat4 IFSmat;
+uniform float TIME;
+uniform int matrixCount;
+
+uint hash(uint value)
+{
+        value ^= value >> 16;
+        value *= 0x7feb352du;
+        value ^= value >> 15;
+        value *= 0x846ca68bu;
+        value ^= value >> 16;
+        return value;
+}
 
 void main()
 {
         uint pID = gl_GlobalInvocationID.x;
-        if(pID >= uint(pointCount)) return;
+        if(pID >= uint(pointCount) || matrixCount <= 0) return;
 
-        points[pID] = vec4(points[pID] * IFSmat);
+        uint seed = pID ^ uint(TIME * 60.0);
+        uint matrixIndex = hash(seed) % uint(matrixCount);
+        points[pID] = IFSMatrices[matrixIndex] * points[pID];
 }

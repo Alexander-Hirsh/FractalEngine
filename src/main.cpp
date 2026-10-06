@@ -43,6 +43,8 @@ int main()
         input = (Input*)bumpAlloc(&persistentStorage, sizeof(Input));
         renderData = (RenderData*)bumpAlloc(&persistentStorage, sizeof(RenderData));
         *renderData = {};
+        IFS ifs = {};
+        ifs.generateNewParameters();
         
         platformFillKeycodeLookup();
         platformCreateWindow(RENDER_WIDTH * 2, RENDER_HEIGHT * 2, L"FractalEngine");
@@ -93,11 +95,13 @@ int main()
                 reloadSimDll(&transientStorage);
 
                 platformUpdateWindow();
-                updateSim(renderData, input, deltaTime);
+                updateSim(renderData, input, &ifs, deltaTime);
 
-                glRender(&transientStorage, timeSeconds);
+                glRender(&transientStorage, ifs, timeSeconds);
 
                 platformSwapBuffers();
+
+                if(key_pressed_this_frame(KEY_G)) ifs.generateNewParameters();
 
                 transientStorage.used = 0;
         }
@@ -105,9 +109,9 @@ int main()
         return 0;
 }
 
-void updateSim(RenderData* renderDataIn, Input* inputIn, float deltaTimeIn)
+void updateSim(RenderData* renderDataIn, Input* inputIn, IFS* ifs, float deltaTimeIn)
 {
-        updateSimPtr(renderDataIn, inputIn, deltaTimeIn);
+        updateSimPtr(renderDataIn, inputIn, ifs, deltaTimeIn);
 }
 
 double getDeltaTime()

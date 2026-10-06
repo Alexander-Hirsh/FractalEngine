@@ -607,9 +607,24 @@ struct vec4
                 return values[idx];
         }
 
+        const float& operator[](int idx) const
+        {
+                return values[idx];
+        }
+
         bool operator==(vec4 other)
         {
                 return x == other.x && y == other.y && z == other.z && w == other.w;
+        }
+
+        vec4& operator+=(const vec4& other)
+        {
+                x += other.x;
+                y += other.y;
+                z += other.z;
+                w += other.w;
+
+                return *this;
         }
 };
 
@@ -647,31 +662,36 @@ struct mat4
                 return values[col];
         }
 
+        const vec4& operator[](int col) const
+        {
+                return values[col];
+        }
+
         mat4 operator*(const mat4& b) const
         {
                 mat4 result = {};
 
-                result.ax = ax * b.ax + ay * b.bx + az * b.cx + aw * b.dx;
-                result.ay = ax * b.ay + ay * b.by + az * b.cy + aw * b.dy;
-                result.az = ax * b.az + ay * b.bz + az * b.cz + aw * b.dz;
-                result.aw = ax * b.aw + ay * b.bw + az * b.cw + aw * b.dw;
+                for (int col = 0; col < 4; col++)
+                {
+                        for (int row = 0; row < 4; row++)
+                        {
+                                result[col][row] =
+                                        (*this)[0][row] * b[col][0] +
+                                        (*this)[1][row] * b[col][1] +
+                                        (*this)[2][row] * b[col][2] +
+                                        (*this)[3][row] * b[col][3];
+                        }
+                }
 
-                result.bx = bx * b.ax + by * b.bx + bz * b.cx + bw * b.dx;
-                result.by = bx * b.ay + by * b.by + bz * b.cy + bw * b.dy;
-                result.bz = bx * b.az + by * b.bz + bz * b.cz + bw * b.dz;
-                result.bw = bx * b.aw + by * b.bw + bz * b.cw + bw * b.dw;
+                return result;
+        }
 
-                result.cx = cx * b.ax + cy * b.bx + cz * b.cx + cw * b.dx;
-                result.cy = cx * b.ay + cy * b.by + cz * b.cy + cw * b.dy;
-                result.cz = cx * b.az + cy * b.bz + cz * b.cz + cw * b.dz;
-                result.cw = cx * b.aw + cy * b.bw + cz * b.cw + cw * b.dw;
+        mat4& operator+=(const mat4& other)
+        {
+                for (int i = 0; i < 4; i++)
+                        (*this)[i] += other[i];
 
-                result.dx = dx * b.ax + dy * b.bx + dz * b.cx + dw * b.dx;
-                result.dy = dx * b.ay + dy * b.by + dz * b.cy + dw * b.dy;
-                result.dz = dx * b.az + dy * b.bz + dz * b.cz + dw * b.dz;
-                result.dw = dx * b.aw + dy * b.bw + dz * b.cw + dw * b.dw;
-
-        return result;
+                return *this;
         }
 };
 
@@ -731,7 +751,7 @@ float degToRad(float d)
 
 mat4 constrScaleMatrix(vec3 scale)
 {
-        mat4 result;
+        mat4 result = {};
         result.ax = scale.x;
         result.by = scale.y;
         result.cz = scale.z;
@@ -742,7 +762,7 @@ mat4 constrScaleMatrix(vec3 scale)
 
 mat4 constrRotationMatrix(vec3 rot)
 {
-        mat4 result;
+        mat4 result = {};
         float& x = rot.x;
         float& y = rot.y;
         float& z = rot.z;
@@ -766,7 +786,7 @@ mat4 constrRotationMatrix(vec3 rot)
 
 mat4 constrShearMatrix(vec3 shear)
 {
-        mat4 result;
+        mat4 result = {};
 
         float x = tan(shear.x);
         float y = tan(shear.y);
@@ -791,7 +811,7 @@ mat4 constrShearMatrix(vec3 shear)
 
 mat4 constrTranslationMatrix(vec3 translation)
 {
-        mat4 result;
+        mat4 result = {};
         result.aw = translation.x;
         result.bw = translation.y;
         result.cw = translation.z;

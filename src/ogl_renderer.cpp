@@ -1,6 +1,7 @@
 #include "ogl_renderer.h"
 
 #include "render_interface.h"
+#include "sim.h"
 
 
 /// ##############################################################################################
@@ -21,15 +22,11 @@ struct GLContext
 
         GLint projectionID;
         GLint cameraPositionID;
+        GLuint matrixBufferID;
         GLint computePointCountID;
         GLint computeTimeID;
+        GLint computeMatrixCountID;
         long long pointShaderTimestamp;
-};
-
-struct GPUPoint
-{
-        float position[4];
-        float color[4];
 };
 
 
@@ -175,14 +172,33 @@ bool glInit(BumpAllocator* transientStorage)
         glBindVertexArray(glContext.pointVertexArrayID);
         glGenBuffers(1, &glContext.pointBufferID);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.pointBufferID);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(GPUPoint) * MAX_POINTS,
-                     nullptr, GL_DYNAMIC_DRAW);
+
+        vec4* initialPoints = (vec4*)bumpAlloc(transientStorage, sizeof(vec4) * MAX_POINTS);
+        for(int i = 0; i < MAX_POINTS; i++)
+        {
+                initialPoints[i] = {};
+                initialPoints[i].x = (rng_f() * 2.0f - 1.0f) * 2.0f;
+                initialPoints[i].y = (rng_f() * 2.0f - 1.0f) * 1.2f;
+                initialPoints[i].z = -2.5f;
+                initialPoints[i].w = 1.0f;
+        }
+
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vec4) * MAX_POINTS,
+                     initialPoints, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
+
+        glGenBuffers(1, &glContext.matrixBufferID);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.matrixBufferID);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(mat4) * IFS::maxNumOfMatrix,
+                     nullptr, GL_DYNAMIC_DRAW);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
 
         glContext.projectionID = glGetUniformLocation(glContext.pointProgramID, "perspectProjection");
         glContext.cameraPositionID = glGetUniformLocation(glContext.pointProgramID, "cameraPosition");
         glContext.computePointCountID = glGetUniformLocation(glContext.computeProgramID, "pointCount");
-        glContext.computeTimeID = glGetUniformLocation(glContext.computeProgramID, "timeSeconds");
+        glContext.computeTimeID = glGetUniformLocation(glContext.computeProgramID, "TIME");
+        glContext.computeMatrixCountID = glGetUniformLocation(glContext.computeProgramID, "matrixCount");
+
 
         glEnable(GL_FRAMEBUFFER_SRGB);
         glEnable(GL_DEPTH_TEST);
@@ -191,42 +207,54 @@ bool glInit(BumpAllocator* transientStorage)
         return true;
 }
 
-void glRender(BumpAllocator* transientStorage, float timeSeconds)
+void glRender(BumpAllocator* transientStorage, const IFS& ifs, float timeSeconds)
 {
-        long long timestampVert = getTimestamp("assets/shaders/point_cloud.vert");
-        long long timestampFrag = getTimestamp("assets/shaders/point_cloud.frag");
-        long long timestampCompute = getTimestamp("assets/shaders/IFS.comp");
-        if(timestampVert > glContext.pointShaderTimestamp ||
-           timestampFrag > glContext.pointShaderTimestamp ||
-           timestampCompute > glContext.pointShaderTimestamp)
+        // HOT SHADER RELOADING
         {
-                GLuint programID = glCreatePointProgram(transientStorage);
-                GLuint computeProgramID = glCreateComputeProgram(transientStorage);
-                if(programID && computeProgramID)
+                long long timestampVert = getTimestamp("assets/shaders/point_cloud.vert");
+                long long timestampFrag = getTimestamp("assets/shaders/point_cloud.frag");
+                long long timestampCompute = getTimestamp("assets/shaders/IFS.comp");
+
+                if(timestampVert > glContext.pointShaderTimestamp ||
+                timestampFrag > glContext.pointShaderTimestamp ||
+                timestampCompute > glContext.pointShaderTimestamp)
                 {
-                        glDeleteProgram(glContext.pointProgramID);
-                        glDeleteProgram(glContext.computeProgramID);
-                        glContext.pointProgramID = programID;
-                        glContext.computeProgramID = computeProgramID;
-                        glContext.projectionID = glGetUniformLocation(programID, "perspectProjection");
-                        glContext.cameraPositionID = glGetUniformLocation(programID, "cameraPosition");
-                        glContext.computePointCountID = glGetUniformLocation(computeProgramID, "pointCount");
-                        glContext.computeTimeID = glGetUniformLocation(computeProgramID, "timeSeconds");
-                        glContext.pointShaderTimestamp = max(timestampCompute,
-                                                             max(timestampVert, timestampFrag));
+                        GLuint programID = glCreatePointProgram(transientStorage);
+                        GLuint computeProgramID = glCreateComputeProgram(transientStorage);
+                        if(programID && computeProgramID)
+                        {
+                                glDeleteProgram(glContext.pointProgramID);
+                                glDeleteProgram(glContext.computeProgramID);
+                                glContext.pointProgramID = programID;
+                                glContext.computeProgramID = computeProgramID;
+                                glContext.projectionID = glGetUniformLocation(programID, "perspectProjection");
+                                glContext.cameraPositionID = glGetUniformLocation(programID, "cameraPosition");
+                                glContext.computePointCountID = glGetUniformLocation(computeProgramID, "pointCount");
+                                glContext.computeTimeID = glGetUniformLocation(computeProgramID, "TIME");
+                                glContext.computeMatrixCountID = glGetUniformLocation(computeProgramID, "matrixCount");
+                                glContext.pointShaderTimestamp = max(timestampCompute,
+                                                                max(timestampVert, timestampFrag));
+                        }
+                        else
+                        {
+                                if(programID) glDeleteProgram(programID);
+                                if(computeProgramID) glDeleteProgram(computeProgramID);
+                        }
                 }
-                else
+
+                if(input->screenSize.x <= 0 || input->screenSize.y <= 0) return;
+                if(renderData->pointCount < 0 || renderData->pointCount > MAX_POINTS)
                 {
-                        if(programID) glDeleteProgram(programID);
-                        if(computeProgramID) glDeleteProgram(computeProgramID);
+                        SM_ASSERT(false, "Point count %d exceeds the render capacity of %d",
+                                renderData->pointCount, MAX_POINTS);
+                        return;
                 }
         }
 
-        if(input->screenSize.x <= 0 || input->screenSize.y <= 0) return;
-        if(renderData->pointCount < 0 || renderData->pointCount > MAX_POINTS)
+        if(ifs.currNumOfMatrix <= 0 || ifs.currNumOfMatrix > IFS::maxNumOfMatrix)
         {
-                SM_ASSERT(false, "Point count %d exceeds the render capacity of %d",
-                          renderData->pointCount, MAX_POINTS);
+                SM_ASSERT(false, "IFS matrix count %d is outside the valid range 1-%d",
+                          ifs.currNumOfMatrix, IFS::maxNumOfMatrix);
                 return;
         }
 
@@ -236,10 +264,16 @@ void glRender(BumpAllocator* transientStorage, float timeSeconds)
 
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.matrixBufferID);
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
+                        (GLsizeiptr)(sizeof(mat4) * ifs.currNumOfMatrix),
+                        ifs.IFSMatrices);
 
         glUseProgram(glContext.computeProgramID);
         glUniform1i(glContext.computePointCountID, renderData->pointCount);
         glUniform1f(glContext.computeTimeID, timeSeconds);
+        glUniform1i(glContext.computeMatrixCountID, ifs.currNumOfMatrix);
 
         GLuint workGroupCount = (renderData->pointCount + POINT_COMPUTE_LOCAL_SIZE - 1) /
                                                 POINT_COMPUTE_LOCAL_SIZE;
