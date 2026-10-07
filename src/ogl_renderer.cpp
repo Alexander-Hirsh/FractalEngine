@@ -202,7 +202,7 @@ bool glInit(BumpAllocator* transientStorage)
         return true;
 }
 
-void glRender(BumpAllocator* transientStorage, const IFS& ifs, float deltaTime)
+void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float timeSeconds)
 {
         // HOT SHADER RELOADING
         {
@@ -271,7 +271,7 @@ void glRender(BumpAllocator* transientStorage, const IFS& ifs, float deltaTime)
 
         glUseProgram(glContext.computeProgramID);
         glUniform1i(glContext.computePointCountID, renderData->pointCount);
-        glUniform1f(glContext.computeTimeID, deltaTime);
+        glUniform1f(glContext.computeTimeID, timeSeconds);
         glUniform1i(glContext.computeMatrixCountID, ifs.currNumOfMatrix);
 
         GLuint workGroupCount = (renderData->pointCount + POINT_COMPUTE_LOCAL_SIZE - 1) /
@@ -279,7 +279,7 @@ void glRender(BumpAllocator* transientStorage, const IFS& ifs, float deltaTime)
 
         glDispatchCompute(workGroupCount, 1, 1);
 
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        //glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
         // Use base vertex + fragment shader to draw computed points
         {        

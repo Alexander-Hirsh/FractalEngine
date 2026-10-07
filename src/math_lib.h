@@ -835,9 +835,9 @@ vec3 randVec3(float min, float max)
 /// ##############################################################################################
 ///                                     Interpolation
 /// ##############################################################################################
-void fhfilerp(float& a, float b, float r, float dt)
+float fhfilerp(float a, float b, float r, float dt)
 {
-        a = (a - b) * pow(r, dt) + b;
+        return (a - b) * pow(1.0f - r, dt) + b;
 }
 
 void vec3Lerp(vec3& a, vec3 b, float r, float dt)

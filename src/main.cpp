@@ -59,6 +59,16 @@ int main()
                 float deltaTime = (float)getDeltaTime();
                 timeSeconds += deltaTime;
 
+                double currentFps = deltaTime > 0.0f ? 1.0 / deltaTime : 0.0;
+                static double minFps = 0.0;
+                static double maxFps = 0.0;
+                if(currentFps > 0.0)
+                {
+                        if(minFps == 0.0 || currentFps < minFps) minFps = currentFps;
+                        if(currentFps > maxFps) maxFps = currentFps;
+                }
+
+
                 // Performance stats
                 {
                         static float timer = 0.0f;
@@ -66,16 +76,7 @@ int main()
                         if(timer > 1.5f)
                         {
                                 timer = 0.0f;
-
-                                double currentFps = deltaTime > 0.0f ? 1.0 / deltaTime : 0.0;
-                                static double minFps = 0.0;
-                                static double maxFps = 0.0;
-                                if(currentFps > 0.0)
-                                {
-                                        if(minFps == 0.0 || currentFps < minFps) minFps = currentFps;
-                                        if(currentFps > maxFps) maxFps = currentFps;
-                                }
-
+                                
                                 SM_TRACE(
                                                 "\nms:         %f \n" 
                                                 "current FPS: %f \n"
@@ -97,7 +98,7 @@ int main()
                 platformUpdateWindow();
                 updateSim(renderData, input, &ifs, deltaTime);
 
-                glRender(&transientStorage, ifs, timeSeconds);
+                glRender(&transientStorage, ifs, deltaTime, timeSeconds);
 
                 platformSwapBuffers();
 

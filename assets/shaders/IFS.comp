@@ -61,7 +61,7 @@ void main()
         uint pID = gl_GlobalInvocationID.x;
         if(pID >= uint(pointCount)) return;
 
-        uint frame = uint(TIME * 60.0);
+        uint frame = uint(TIME * 1.0);
         vec4 point = points[pID];
 
         for(uint step = 0u; step < ITERATIONS_PER_FRAME; step++)
