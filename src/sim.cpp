@@ -24,7 +24,7 @@ EXPORT_FN void updateSim(RenderData* renderDataIn, Input* inputIn, IFS* ifs, flo
         static float timer = 0.0f;
         timer += deltaTimeIn;
 
-        if(timer >= 2.0f)
+        if(timer >= 3.0f)
         {
                 timer = 0.0f;
                 ifs->generateNewParameters();

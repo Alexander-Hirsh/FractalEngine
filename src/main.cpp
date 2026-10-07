@@ -37,7 +37,7 @@ int main()
         rng_seed(time(NULL), 1);
         getDeltaTime();
 
-        BumpAllocator transientStorage = makeBumpAllocator(MB(50));
+        BumpAllocator transientStorage = makeBumpAllocator(MB(2000));
         BumpAllocator persistentStorage = makeBumpAllocator(MB(50));
 
         input = (Input*)bumpAlloc(&persistentStorage, sizeof(Input));

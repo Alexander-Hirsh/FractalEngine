@@ -7,12 +7,12 @@
 /// ##############################################################################################
 ///                                     Render Constants
 /// ##############################################################################################
-constexpr int MAX_POINTS = 65535;
-constexpr int POINT_COMPUTE_LOCAL_SIZE = 256;
-constexpr int MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
-constexpr int RENDER_WIDTH = 1280;
-constexpr int RENDER_HEIGHT = 720;
-static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_COUNT_X,
+constexpr uint64_t MAX_POINTS = 5000000;
+constexpr uint64_t POINT_COMPUTE_LOCAL_SIZE = 256;
+constexpr uint64_t MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
+constexpr int RENDER_WIDTH = 1920;
+constexpr int RENDER_HEIGHT = 1080;
+static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_COUNT_X * MAX_COMPUTE_WORK_GROUP_COUNT_X ,
               "MAX_POINTS must fit in one compute dispatch");
 
 

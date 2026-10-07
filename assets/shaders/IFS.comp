@@ -67,8 +67,8 @@ void main()
         for(uint step = 0u; step < ITERATIONS_PER_FRAME; step++)
         {
                 uint seed = pID ^ (frame * 0x9e3779b9u) ^ (step * 0x85ebca6bu);
-                uint matrixIndex = lowbias32(seed) % uint(serpTriangle.length());
-                point = serpTriangle[matrixIndex] * point;
+                uint matrixIndex = lowbias32(seed) % uint(matrixCount);
+                point = IFSMatrices[matrixIndex] * point;
         }
 
         points[pID] = point;

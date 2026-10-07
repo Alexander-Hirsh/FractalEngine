@@ -30,6 +30,8 @@ struct IFS
 
         mat4 IFSMatrices[maxNumOfMatrix] = {};
 
+        float iCurve = 0.18f;
+
         void generateNewParameters()
         {
                 currNumOfMatrix = (int)(rng_f() * (maxNumOfMatrix - 1)) + 2;
@@ -40,18 +42,20 @@ struct IFS
                         newRotation[i] = randVec3(-degToRad(360), degToRad(360));
                         newShear[i] = randVec3(-0.1f, 0.1f);
                         newTranslation[i] = randVec3(-0.5f, 0.5f);
-
-                        currScale[i] = newScale[i];
-                        currRotation[i] = newRotation[i];
-                        currShear[i] = newShear[i];
-                        currTranslation[i] = newTranslation[i];
                 }
-
-                generateTransformMatrix();
         }
 
-        void generateTransformMatrix()
+        void generateTransformMatrix(float dt)
         {
+                
+                for(int i = 0; i < currNumOfMatrix; i++)
+                {
+                        vec3Lerp(currScale[i], newScale[i], iCurve, dt);
+                        vec3Lerp(currRotation[i], newRotation[i], iCurve, dt);
+                        vec3Lerp(currShear[i], newShear[i], iCurve, dt);
+                        vec3Lerp(currTranslation[i], newTranslation[i], iCurve, dt);
+                }
+
                 for(int i = 0; i < currNumOfMatrix; i++)
                 {
                         IFSMatrices[i] =  translationMatrix(currTranslation[i]) *

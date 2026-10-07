@@ -202,7 +202,7 @@ bool glInit(BumpAllocator* transientStorage)
         return true;
 }
 
-void glRender(BumpAllocator* transientStorage, const IFS& ifs, float timeSeconds)
+void glRender(BumpAllocator* transientStorage, const IFS& ifs, float deltaTime)
 {
         // HOT SHADER RELOADING
         {
@@ -248,6 +248,8 @@ void glRender(BumpAllocator* transientStorage, const IFS& ifs, float timeSeconds
                 return;
         }
 
+        ifs.generateTransformMatrix(deltaTime);
+
         if(ifs.currNumOfMatrix <= 0 || ifs.currNumOfMatrix > IFS::maxNumOfMatrix)
         {
                 SM_ASSERT(false, "IFS matrix count %d is outside the valid range 1-%d",
@@ -269,13 +271,14 @@ void glRender(BumpAllocator* transientStorage, const IFS& ifs, float timeSeconds
 
         glUseProgram(glContext.computeProgramID);
         glUniform1i(glContext.computePointCountID, renderData->pointCount);
-        glUniform1f(glContext.computeTimeID, timeSeconds);
+        glUniform1f(glContext.computeTimeID, deltaTime);
         glUniform1i(glContext.computeMatrixCountID, ifs.currNumOfMatrix);
 
         GLuint workGroupCount = (renderData->pointCount + POINT_COMPUTE_LOCAL_SIZE - 1) /
                                                 POINT_COMPUTE_LOCAL_SIZE;
 
         glDispatchCompute(workGroupCount, 1, 1);
+
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
         // Use base vertex + fragment shader to draw computed points

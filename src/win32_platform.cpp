@@ -122,7 +122,7 @@ bool platformCreateWindow(int width, int height, const wchar_t* title)
         }
 
         // WS_CAPTION 
-        int dwStyle = WS_OVERLAPPEDWINDOW;
+        int dwStyle = WS_OVERLAPPEDWINDOW; // WS_POPUP
 
         PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB = nullptr;
         PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = nullptr;
@@ -226,8 +226,8 @@ bool platformCreateWindow(int width, int height, const wchar_t* title)
                 window = CreateWindowExW(0, title, // This references lpszClassName from wc
                                          title,    // This is the actual Title
                                          dwStyle,
-                                         100,
-                                         100,
+                                         0,
+                                         0,
                                          width,
                                          height,
                                          NULL,     // parent
