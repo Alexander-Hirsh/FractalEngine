@@ -13,11 +13,18 @@ layout(std430, binding = 1) readonly buffer MatrixBuffer
         mat4 IFSMatrices[];
 };
 
+layout(std430, binding = 2) buffer AOGridBuffer
+{
+        bool AOgrid[];
+};
+
 #define hash(x) lowbias32(x)
 
-uniform int pointCount;
 uniform float TIME;
+
+uniform int pointCount;
 uniform int matrixCount;
+uniform int AOgridSize;
 
 const uint ITERATIONS_PER_FRAME = 16u;
 
@@ -72,4 +79,11 @@ void main()
         }
 
         points[pID] = point;
+
+        // Get ID of the point in the AO grid
+        int x = int((point.x + 0.5) * AOgridSize);
+        int y = int((point.y + 0.5) * AOgridSize);
+        int z = int((point.z + 0.5) * AOgridSize);
+
+        AOGridBuffer[x + AOgridSize * (y + AOgridSize * z)] = true;
 }

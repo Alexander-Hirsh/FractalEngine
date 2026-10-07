@@ -1,12 +1,6 @@
 #include "ogl_renderer.h"
 
 #include "render_interface.h"
-#include "sim.h"
-
-
-/// ##############################################################################################
-///                                     OpenGL Structs
-/// ##############################################################################################
 
 
 /// ##############################################################################################
@@ -19,12 +13,15 @@ struct GLContext
 
         GLuint pointVertexArrayID;
         GLuint pointBufferID;
-
-        GLint projectionID;
         GLuint matrixBufferID;
-        GLint computePointCountID;
-        GLint computeTimeID;
-        GLint computeMatrixCountID;
+        GLuint AOgridBufferID;
+
+        GLuint projectionID;
+
+        GLuint computeTimeID;
+        GLuint computePointCountID;
+        GLuint computeMatrixCountID;
+        GLuint computeAOGridSizeID;
         long long pointShaderTimestamp;
 };
 
@@ -167,32 +164,51 @@ bool glInit(BumpAllocator* transientStorage)
                                                     getTimestamp("assets/shaders/point_cloud.frag"))
                                         );
 
+
         glGenVertexArrays(1, &glContext.pointVertexArrayID);
         glBindVertexArray(glContext.pointVertexArrayID);
 
-        glGenBuffers(1, &glContext.pointBufferID);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.pointBufferID);
-
-        vec4* initialPoints = (vec4*)bumpAlloc(transientStorage, sizeof(vec4) * MAX_POINTS);
-        for(int i = 0; i < MAX_POINTS; i++)
+        // SUPPLY POINT BUFFER TO COMPUTE SHADER TO WORK ON
         {
-                initialPoints[i] = {0.0f, 0.0f, 0.0f, 1.0f};
+                glGenBuffers(1, &glContext.pointBufferID);
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.pointBufferID);
+
+                vec4* initialPoints = (vec4*)bumpAlloc(transientStorage, sizeof(vec4) * MAX_POINTS);
+                for(int i = 0; i < MAX_POINTS; i++)
+                {
+                        initialPoints[i] = {0.0f, 0.0f, 0.0f, 1.0f};
+                }
+
+                glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vec4) * MAX_POINTS,
+                        initialPoints, GL_DYNAMIC_DRAW);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
         }
 
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vec4) * MAX_POINTS,
-                     initialPoints, GL_DYNAMIC_DRAW);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
+        // SUPPLY TRANSFORM MATRICES TO COMPUTE SHADER
+        {
+                glGenBuffers(1, &glContext.matrixBufferID);
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.matrixBufferID);
+                glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(mat4) * IFS::maxNumOfMatrix,
+                             nullptr, GL_DYNAMIC_DRAW);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
+        }
 
-        glGenBuffers(1, &glContext.matrixBufferID);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.matrixBufferID);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(mat4) * IFS::maxNumOfMatrix,
-                     nullptr, GL_DYNAMIC_DRAW);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
+        // SUPPLY AMBIENT OCCLUSION GRID FOR LIGHTING
+        {
+                glGenBuffers(1, &glContext.AOgridBufferID);
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.AOgridBufferID);
+                glBufferData(GL_SHADER_STORAGE_BUFFER, 
+                             sizeof(bool) * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE,
+                             nullptr, GL_DYNAMIC_DRAW);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, glContext.AOgridBufferID);
+        }
 
         glContext.projectionID = glGetUniformLocation(glContext.pointProgramID, "cameraSpaceTransform");
-        glContext.computePointCountID = glGetUniformLocation(glContext.computeProgramID, "pointCount");
+
         glContext.computeTimeID = glGetUniformLocation(glContext.computeProgramID, "TIME");
+        glContext.computePointCountID = glGetUniformLocation(glContext.computeProgramID, "pointCount");
         glContext.computeMatrixCountID = glGetUniformLocation(glContext.computeProgramID, "matrixCount");
+        glContext.computeAOGridSizeID = glGetUniformLocation(glContext.computeProgramID, "AOgridSize");
 
 
         glEnable(GL_FRAMEBUFFER_SRGB);
@@ -250,13 +266,6 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
         ifs.generateTransformMatrix(deltaTime);
 
-        if(ifs.currNumOfMatrix <= 0 || ifs.currNumOfMatrix > IFS::maxNumOfMatrix)
-        {
-                SM_ASSERT(false, "IFS matrix count %d is outside the valid range 1-%d",
-                          ifs.currNumOfMatrix, IFS::maxNumOfMatrix);
-                return;
-        }
-
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, input->screenSize.x, input->screenSize.y);
@@ -264,6 +273,8 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, glContext.AOgridBufferID);
+
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.matrixBufferID);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
                         (GLsizeiptr)(sizeof(mat4) * ifs.currNumOfMatrix),
@@ -279,7 +290,7 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
         glDispatchCompute(workGroupCount, 1, 1);
 
-        //glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        //glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);  // Do I even need this?
 
         // Use base vertex + fragment shader to draw computed points
         {        

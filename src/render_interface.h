@@ -8,8 +8,10 @@
 ///                                     Render Constants
 /// ##############################################################################################
 constexpr uint64_t MAX_POINTS = 1000000;
-constexpr uint64_t POINT_COMPUTE_LOCAL_SIZE = 256;
+constexpr int POINT_COMPUTE_LOCAL_SIZE = 256;
 constexpr uint64_t MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
+constexpr int AO_GRID_SIDE_SIZE = 32;
+
 constexpr int RENDER_WIDTH = 1920/1.5;
 constexpr int RENDER_HEIGHT = 1080/1.5;
 static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_COUNT_X * MAX_COMPUTE_WORK_GROUP_COUNT_X ,
@@ -35,6 +37,58 @@ struct RenderData
         int pointCount;
 };
 
+
+/// ##############################################################################################
+///                                     Simulation Structs
+/// ##############################################################################################
+struct IFS
+{
+        int currNumOfMatrix = 0;
+        static const int maxNumOfMatrix = 4;
+
+        vec3 currScale[maxNumOfMatrix] = {};
+        vec3 currRotation[maxNumOfMatrix] = {};
+        vec3 currShear[maxNumOfMatrix] = {};
+        vec3 currTranslation[maxNumOfMatrix] = {};
+
+        vec3 newScale[maxNumOfMatrix] = {};
+        vec3 newRotation[maxNumOfMatrix] = {};
+        vec3 newShear[maxNumOfMatrix] = {};
+        vec3 newTranslation[maxNumOfMatrix] = {};
+
+        mat4 IFSMatrices[maxNumOfMatrix] = {};
+
+        float iCurve = 0.99f;
+
+        void generateNewParameters()
+        {
+                currNumOfMatrix = (int)(rng_f() * (maxNumOfMatrix - 1)) + 2;
+
+                for(int i = 0; i < currNumOfMatrix; i++)
+                {
+                        newScale[i] = randVec3(0.65f, 0.75f);
+                        newRotation[i] = randVec3(-degToRad(80), degToRad(80));
+                        newShear[i] = randVec3(-0.15f, 0.15f);
+                        newTranslation[i] = randVec3(-0.5f, 0.5f);
+                }
+        }
+
+        void generateTransformMatrix(float dt)
+        {
+                for(int i = 0; i < currNumOfMatrix; i++)
+                {
+                        vec3Lerp(currScale[i], newScale[i], iCurve, dt);
+                        vec3Lerp(currRotation[i], newRotation[i], iCurve, dt);
+                        vec3Lerp(currShear[i], newShear[i], iCurve, dt);
+                        vec3Lerp(currTranslation[i], newTranslation[i], iCurve, dt);
+
+                        IFSMatrices[i] = translationMatrix(currTranslation[i]) *
+                                         rotationMatrix(currRotation[i])    *
+                                         shearMatrix(currShear[i])          *
+                                         scaleMatrix(currScale[i]);
+                }
+        }
+};
 
 /// ##############################################################################################
 ///                                     Render Globals

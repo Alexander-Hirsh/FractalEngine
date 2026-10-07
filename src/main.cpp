@@ -2,8 +2,6 @@
 
 #include "input.h"
 
-#include "sim.h"
-
 #include "platform.h"
 
 #define APIENTRY
@@ -18,19 +16,12 @@
 
 #include "ogl_renderer.cpp"
 
-/// ##############################################################################################
-///                                     Game DLL shit
-/// ##############################################################################################
-typedef decltype(updateSim) updateSimType;
-static updateSimType* updateSimPtr;
-
 
 /// ##############################################################################################
 ///                                     Crossplatform Functions
 /// ##############################################################################################
 #include <chrono>
 double getDeltaTime();
-void reloadSimDll(BumpAllocator* transientStorage);
 
 int main()
 {
@@ -43,6 +34,7 @@ int main()
         input = (Input*)bumpAlloc(&persistentStorage, sizeof(Input));
         renderData = (RenderData*)bumpAlloc(&persistentStorage, sizeof(RenderData));
         *renderData = {};
+        renderData->pointCount = MAX_POINTS;
         IFS ifs = {};
         ifs.generateNewParameters();
         
@@ -68,17 +60,16 @@ int main()
                         if(currentFps > maxFps) maxFps = currentFps;
                 }
 
-
                 // Performance stats
                 {
-                        static float timer = 0.0f;
-                        timer += deltaTime;
-                        if(timer > 1.5f)
+                        static float displayTimer = 0.0f;
+                        displayTimer += deltaTime;
+                        if(displayTimer > 1.5f)
                         {
-                                timer = 0.0f;
+                                displayTimer = 0.0f;
                                 
                                 SM_TRACE(
-                                                "\nms:         %f \n" 
+                                                "\nms:        %f \n" 
                                                 "current FPS: %f \n"
                                                 "min FPS:     %f \n"
                                                 "max FPS:     %f \n", 
@@ -91,12 +82,27 @@ int main()
 
                                 if(deltaTime > 0.1f) deltaTime = 0.1f;
                         }
+
+                        static float resetTimer = 0.0f;
+                        resetTimer += deltaTime;
+                        if(resetTimer > 10.0f)
+                        {
+                                resetTimer = 0.0f;
+                                minFps = 0.0f;
+                                maxFps = 0.0f;
+                        }
                 }
 
-                reloadSimDll(&transientStorage);
-
                 platformUpdateWindow();
-                updateSim(renderData, input, &ifs, deltaTime);
+
+                static float timer = 0.0f;
+                timer += deltaTime;
+
+                if(timer >= 3.0f)
+                {
+                        timer = 0.0f;
+                        ifs.generateNewParameters();
+                }
 
                 glRender(&transientStorage, ifs, deltaTime, timeSeconds);
 
@@ -110,11 +116,6 @@ int main()
         return 0;
 }
 
-void updateSim(RenderData* renderDataIn, Input* inputIn, IFS* ifs, float deltaTimeIn)
-{
-        updateSimPtr(renderDataIn, inputIn, ifs, deltaTimeIn);
-}
-
 double getDeltaTime()
 {
         // Only executed once when entering the function (static)
@@ -126,40 +127,4 @@ double getDeltaTime()
         lastTime = currentTime; 
 
         return delta;
-}
-
-void reloadSimDll(BumpAllocator* transientStorage)
-{
-        static void* simDLL;
-        static long long lastEditTimestampSimDLL;
-
-        long long currentTimestampSimDLL = getTimestamp("sim.dll");
-
-        if(updateSimPtr == nullptr || currentTimestampSimDLL > lastEditTimestampSimDLL)
-        {
-                if(simDLL)
-                {
-                        bool freeResult = platformFreeDynamicLibrary(simDLL);
-                        SM_ASSERT(freeResult, "Failed to free sim.dll");
-
-                        simDLL = nullptr;
-                        updateSimPtr = nullptr;
-                        SM_TRACE("Freed sim.dll");
-                }
-
-                while(!copyFile("sim.dll", "sim_load.dll", transientStorage))
-                {
-                        SM_TRACE("Failed to copy sim.dll into sim_load.dll, retrying in 10ms");
-                        Sleep(10);
-                }
-                SM_TRACE("Copied sim.dll into sim_load.dll");
-
-                simDLL = platformLoadDynamicLibrary("sim_load.dll");
-                SM_ASSERT(simDLL, "Failed to load sim.dll")
-
-                updateSimPtr = (updateSimType*)platformLoadDynamicFunction(simDLL, "updateSim");
-                SM_ASSERT(updateSimPtr, "Failed to load updateSim function");
-                lastEditTimestampSimDLL = currentTimestampSimDLL;
-
-        }
 }
