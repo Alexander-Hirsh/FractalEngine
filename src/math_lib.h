@@ -749,7 +749,7 @@ float degToRad(float d)
         return d * 0.0174533f;
 }
 
-mat4 constrScaleMatrix(vec3 scale)
+mat4 scaleMatrix(vec3 scale)
 {
         mat4 result = {};
         result.ax = scale.x;
@@ -760,7 +760,7 @@ mat4 constrScaleMatrix(vec3 scale)
         return result;
 }
 
-mat4 constrRotationMatrix(vec3 rot)
+mat4 rotationMatrix(vec3 rot)
 {
         mat4 result = {};
         float& x = rot.x;
@@ -784,7 +784,7 @@ mat4 constrRotationMatrix(vec3 rot)
         return result;
 }
 
-mat4 constrShearMatrix(vec3 shear)
+mat4 shearMatrix(vec3 shear)
 {
         mat4 result = {};
 
@@ -809,9 +809,12 @@ mat4 constrShearMatrix(vec3 shear)
         return result;
 }
 
-mat4 constrTranslationMatrix(vec3 translation)
+mat4 translationMatrix(vec3 translation)
 {
         mat4 result = {};
+        result.ax = 1.0f;
+        result.by = 1.0f;
+        result.cz = 1.0f;
         result.aw = translation.x;
         result.bw = translation.y;
         result.cw = translation.z;

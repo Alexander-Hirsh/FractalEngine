@@ -47,9 +47,9 @@ int main()
         ifs.generateNewParameters();
         
         platformFillKeycodeLookup();
-        platformCreateWindow(RENDER_WIDTH * 2, RENDER_HEIGHT * 2, L"FractalEngine");
-        input->screenSize.x = RENDER_WIDTH * 2;
-        input->screenSize.y = RENDER_HEIGHT * 2;
+        platformCreateWindow(RENDER_WIDTH, RENDER_HEIGHT, L"FractalEngine");
+        input->screenSize.x = RENDER_WIDTH;
+        input->screenSize.y = RENDER_HEIGHT;
         
         glInit(&transientStorage);
 

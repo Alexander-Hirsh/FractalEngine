@@ -10,8 +10,8 @@
 constexpr int MAX_POINTS = 65535;
 constexpr int POINT_COMPUTE_LOCAL_SIZE = 256;
 constexpr int MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
-constexpr int RENDER_WIDTH = 640;
-constexpr int RENDER_HEIGHT = 360;
+constexpr int RENDER_WIDTH = 1280;
+constexpr int RENDER_HEIGHT = 720;
 static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_COUNT_X,
               "MAX_POINTS must fit in one compute dispatch");
 
@@ -22,7 +22,7 @@ static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_CO
 struct Camera3D
 {
         float zoom = 1.0f;
-        vec2 position;
+        vec3 position;
         float fov = 90.0f;
 
         float nearPlane = 0.1f;

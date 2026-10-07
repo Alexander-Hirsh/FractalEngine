@@ -21,7 +21,6 @@ struct GLContext
         GLuint pointBufferID;
 
         GLint projectionID;
-        GLint cameraPositionID;
         GLuint matrixBufferID;
         GLint computePointCountID;
         GLint computeTimeID;
@@ -170,17 +169,14 @@ bool glInit(BumpAllocator* transientStorage)
 
         glGenVertexArrays(1, &glContext.pointVertexArrayID);
         glBindVertexArray(glContext.pointVertexArrayID);
+
         glGenBuffers(1, &glContext.pointBufferID);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.pointBufferID);
 
         vec4* initialPoints = (vec4*)bumpAlloc(transientStorage, sizeof(vec4) * MAX_POINTS);
         for(int i = 0; i < MAX_POINTS; i++)
         {
-                initialPoints[i] = {};
-                initialPoints[i].x = (rng_f() * 2.0f - 1.0f) * 2.0f;
-                initialPoints[i].y = (rng_f() * 2.0f - 1.0f) * 1.2f;
-                initialPoints[i].z = -2.5f;
-                initialPoints[i].w = 1.0f;
+                initialPoints[i] = {0.0f, 0.0f, 0.0f, 1.0f};
         }
 
         glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vec4) * MAX_POINTS,
@@ -193,8 +189,7 @@ bool glInit(BumpAllocator* transientStorage)
                      nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
 
-        glContext.projectionID = glGetUniformLocation(glContext.pointProgramID, "perspectProjection");
-        glContext.cameraPositionID = glGetUniformLocation(glContext.pointProgramID, "cameraPosition");
+        glContext.projectionID = glGetUniformLocation(glContext.pointProgramID, "cameraSpaceTransform");
         glContext.computePointCountID = glGetUniformLocation(glContext.computeProgramID, "pointCount");
         glContext.computeTimeID = glGetUniformLocation(glContext.computeProgramID, "TIME");
         glContext.computeMatrixCountID = glGetUniformLocation(glContext.computeProgramID, "matrixCount");
@@ -221,14 +216,15 @@ void glRender(BumpAllocator* transientStorage, const IFS& ifs, float timeSeconds
                 {
                         GLuint programID = glCreatePointProgram(transientStorage);
                         GLuint computeProgramID = glCreateComputeProgram(transientStorage);
+
                         if(programID && computeProgramID)
                         {
                                 glDeleteProgram(glContext.pointProgramID);
                                 glDeleteProgram(glContext.computeProgramID);
+
                                 glContext.pointProgramID = programID;
                                 glContext.computeProgramID = computeProgramID;
-                                glContext.projectionID = glGetUniformLocation(programID, "perspectProjection");
-                                glContext.cameraPositionID = glGetUniformLocation(programID, "cameraPosition");
+                                glContext.projectionID = glGetUniformLocation(programID, "cameraSpaceTransform");
                                 glContext.computePointCountID = glGetUniformLocation(computeProgramID, "pointCount");
                                 glContext.computeTimeID = glGetUniformLocation(computeProgramID, "TIME");
                                 glContext.computeMatrixCountID = glGetUniformLocation(computeProgramID, "matrixCount");
@@ -241,14 +237,15 @@ void glRender(BumpAllocator* transientStorage, const IFS& ifs, float timeSeconds
                                 if(computeProgramID) glDeleteProgram(computeProgramID);
                         }
                 }
+                
+        }
 
-                if(input->screenSize.x <= 0 || input->screenSize.y <= 0) return;
-                if(renderData->pointCount < 0 || renderData->pointCount > MAX_POINTS)
-                {
-                        SM_ASSERT(false, "Point count %d exceeds the render capacity of %d",
-                                renderData->pointCount, MAX_POINTS);
-                        return;
-                }
+        
+        if(renderData->pointCount < 0 || renderData->pointCount > MAX_POINTS)
+        {
+                SM_ASSERT(false, "Point count %d exceeds the render capacity of %d",
+                        renderData->pointCount, MAX_POINTS);
+                return;
         }
 
         if(ifs.currNumOfMatrix <= 0 || ifs.currNumOfMatrix > IFS::maxNumOfMatrix)
@@ -258,9 +255,9 @@ void glRender(BumpAllocator* transientStorage, const IFS& ifs, float timeSeconds
                 return;
         }
 
-        glViewport(0, 0, input->screenSize.x, input->screenSize.y);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, input->screenSize.x, input->screenSize.y);
 
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
@@ -281,15 +278,23 @@ void glRender(BumpAllocator* transientStorage, const IFS& ifs, float timeSeconds
         glDispatchCompute(workGroupCount, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-        glUseProgram(glContext.pointProgramID);
-        Camera3D& camera = renderData->gameCamera;
-        float top = camera.nearPlane * tanf(degToRad(camera.fov / 2.0f));
-        float right = top * ((float)input->screenSize.x / input->screenSize.y);
-        mat4 projection = perspectiveProjection(-right, right, top, -top,
-                                                camera.nearPlane, camera.farPlane);
-        glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, &projection.ax);
-        glUniform2fv(glContext.cameraPositionID, 1, &camera.position.x);
+        // Use base vertex + fragment shader to draw computed points
+        {        
+                glUseProgram(glContext.pointProgramID);
 
-        glBindVertexArray(glContext.pointVertexArrayID);
-        glDrawArrays(GL_POINTS, 0, renderData->pointCount);
+                Camera3D& camera = renderData->gameCamera;
+                float top = camera.nearPlane * tanf(degToRad(camera.fov / 2.0f));
+                float right = top * ((float)input->screenSize.x / input->screenSize.y);
+
+                camera.position.z = 2.0f;
+                mat4 projection = perspectiveProjection(-right, right, top, -top, camera.nearPlane, camera.farPlane);
+                mat4 view = translationMatrix(camera.position * -1.0f);
+
+                mat4 cameraSpaceTransform = projection * view;
+
+                glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, &cameraSpaceTransform.ax);
+
+                glBindVertexArray(glContext.pointVertexArrayID);
+                glDrawArrays(GL_POINTS, 0, renderData->pointCount);
+        }
 }

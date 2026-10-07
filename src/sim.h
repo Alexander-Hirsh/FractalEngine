@@ -40,7 +40,6 @@ struct IFS
                         newRotation[i] = randVec3(-degToRad(360), degToRad(360));
                         newShear[i] = randVec3(-0.1f, 0.1f);
                         newTranslation[i] = randVec3(-0.5f, 0.5f);
-                        newTranslation[i].z = -1.0f - rng_f();
 
                         currScale[i] = newScale[i];
                         currRotation[i] = newRotation[i];
@@ -55,10 +54,10 @@ struct IFS
         {
                 for(int i = 0; i < currNumOfMatrix; i++)
                 {
-                        IFSMatrices[i] = constrTranslationMatrix(currTranslation[i]) *
-                                          constrRotationMatrix(currRotation[i])    *
-                                          constrShearMatrix(currShear[i])          *
-                                          constrScaleMatrix(currScale[i]);
+                        IFSMatrices[i] =  translationMatrix(currTranslation[i]) *
+                                          rotationMatrix(currRotation[i])    *
+                                          shearMatrix(currShear[i])          *
+                                          scaleMatrix(currScale[i]);
                 }
         }
 };
