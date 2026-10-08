@@ -18,10 +18,12 @@ struct GLContext
 
         GLuint projectionID;
 
+        GLuint vertexAOgridSizeID;
+
         GLuint computeTimeID;
         GLuint computePointCountID;
         GLuint computeMatrixCountID;
-        GLuint computeAOGridSizeID;
+        GLuint computeAOgridSizeID;
         long long pointShaderTimestamp;
 };
 
@@ -204,11 +206,12 @@ bool glInit(BumpAllocator* transientStorage)
         }
 
         glContext.projectionID = glGetUniformLocation(glContext.pointProgramID, "cameraSpaceTransform");
+        glContext.vertexAOgridSizeID = glGetUniformLocation(glContext.pointProgramID, "AOgridSize");
 
         glContext.computeTimeID = glGetUniformLocation(glContext.computeProgramID, "TIME");
         glContext.computePointCountID = glGetUniformLocation(glContext.computeProgramID, "pointCount");
         glContext.computeMatrixCountID = glGetUniformLocation(glContext.computeProgramID, "matrixCount");
-        glContext.computeAOGridSizeID = glGetUniformLocation(glContext.computeProgramID, "AOgridSize");
+        glContext.computeAOgridSizeID = glGetUniformLocation(glContext.computeProgramID, "AOgridSize");
 
 
         glEnable(GL_FRAMEBUFFER_SRGB);
@@ -307,6 +310,7 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 mat4 cameraSpaceTransform = projection * view;
 
                 glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, &cameraSpaceTransform.ax);
+                glUniform1i(glContext.vertexAOgridSizeID, AO_GRID_SIDE_SIZE);
 
                 glBindVertexArray(glContext.pointVertexArrayID);
                 glDrawArrays(GL_POINTS, 0, renderData->pointCount);

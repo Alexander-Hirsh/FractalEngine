@@ -81,9 +81,9 @@ void main()
         points[pID] = point;
 
         // Get ID of the point in the AO grid
-        int x = int((point.x + 0.5) * AOgridSize);
-        int y = int((point.y + 0.5) * AOgridSize);
-        int z = int((point.z + 0.5) * AOgridSize);
+        int gridX = int((point.x + 0.5) * AOgridSize);
+        int gridY = int((point.y + 0.5) * AOgridSize);
+        int gridZ = int((point.z + 0.5) * AOgridSize);
 
-        AOGridBuffer[x + AOgridSize * (y + AOgridSize * z)] = true;
+        AOgrid[gridX + AOgridSize * (gridY + AOgridSize * gridZ)] = true;
 }
