@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "assets.h"
 #include "math_lib.h"
 
@@ -17,6 +19,9 @@ constexpr int RENDER_HEIGHT = 1080/1.5;
 static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_COUNT_X * MAX_COMPUTE_WORK_GROUP_COUNT_X ,
               "MAX_POINTS must fit in one compute dispatch");
 
+const char* POINT_PROGRAM_NAME = "point_cloud";
+const char* VOXEL_PROGRAM_NAME = "voxel_cube";
+
 
 /// ##############################################################################################
 ///                                     Render Structs
@@ -24,7 +29,7 @@ static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_CO
 struct Camera3D
 {
         float zoom = 1.0f;
-        vec3 position;
+        vec3 position = vec3(0.5, 0.5, 4.0);
         float fov = 90.0f;
 
         float nearPlane = 0.1f;
@@ -58,7 +63,7 @@ struct IFS
 
         mat4 IFSMatrices[maxNumOfMatrix] = {};
 
-        float iCurve = 0.99f;
+        float iCurve = 0.9975f;
 
         void generateNewParameters()
         {
@@ -67,9 +72,9 @@ struct IFS
                 for(int i = 0; i < currNumOfMatrix; i++)
                 {
                         newScale[i] = randVec3(0.65f, 0.75f);
-                        newRotation[i] = randVec3(-degToRad(80), degToRad(80));
-                        newShear[i] = randVec3(-0.15f, 0.15f);
-                        newTranslation[i] = randVec3(-0.5f, 0.5f);
+                        newRotation[i] = randVec3(-degToRad(40), degToRad(40));
+                        newShear[i] = randVec3(-0.1f, 0.1f);
+                        newTranslation[i] = randVec3(0.0f, 1.0f);
                 }
         }
 

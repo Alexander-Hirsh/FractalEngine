@@ -835,16 +835,17 @@ vec3 randVec3(float min, float max)
 /// ##############################################################################################
 ///                                     Interpolation
 /// ##############################################################################################
-float fhfilerp(float a, float b, float r, float dt)
+float lerpSmooth(float a, float b, float h, float dt)
 {
-        return (a - b) * pow(1.0f - r, dt) + b;
+        return (a - b) * pow(1.0f - h, dt) + b;
+        //return b + (a - b) * pow(-dt/h, 2);
 }
 
-void vec3Lerp(vec3& a, vec3 b, float r, float dt)
+void vec3Lerp(vec3& a, vec3 b, float t, float dt)
 {
         a = vec3(
-                        fhfilerp(a.x, b.x, r, dt),
-                        fhfilerp(a.y, b.y, r, dt),
-                        fhfilerp(a.z, b.z, r, dt)
+                        lerpSmooth(a.x, b.x, t, dt),
+                        lerpSmooth(a.y, b.y, t, dt),
+                        lerpSmooth(a.z, b.z, t, dt)
                 );
 }

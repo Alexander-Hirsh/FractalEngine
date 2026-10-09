@@ -10,6 +10,7 @@ struct GLContext
 {
         GLuint pointProgramID;
         GLuint computeProgramID;
+        GLuint voxelProgramID;
 
         GLuint pointVertexArrayID;
         GLuint pointBufferID;
@@ -54,7 +55,7 @@ static void APIENTRY glDebugCallback(GLenum source, GLenum type, GLuint id, GLen
 
 
 
-GLuint glShaderInit(int shaderType, char* shaderPath, BumpAllocator* transientStorage)
+GLuint glShaderInit(int shaderType, const char* shaderPath, BumpAllocator* transientStorage)
 {
         int fileSize = 0;
         char* shaderData = readFile(shaderPath, &fileSize, transientStorage);
@@ -86,10 +87,10 @@ GLuint glShaderInit(int shaderType, char* shaderPath, BumpAllocator* transientSt
         return shaderID;
 }
 
-GLuint glCreatePointProgram(BumpAllocator* transientStorage)
+GLuint glCreateShaderProgram(BumpAllocator* transientStorage, const char* shaderName)
 {
-        GLuint vertShaderID = glShaderInit(GL_VERTEX_SHADER,   "assets/shaders/point_cloud.vert", transientStorage);
-        GLuint fragShaderID = glShaderInit(GL_FRAGMENT_SHADER, "assets/shaders/point_cloud.frag", transientStorage);
+        GLuint vertShaderID = glShaderInit(GL_VERTEX_SHADER,   (std::string("assets/shaders/") + shaderName + std::string(".vert")).c_str(), transientStorage);
+        GLuint fragShaderID = glShaderInit(GL_FRAGMENT_SHADER, (std::string("assets/shaders/") + shaderName + std::string(".frag")).c_str(), transientStorage);
 
         if(!vertShaderID || !fragShaderID)
         {
@@ -155,13 +156,18 @@ bool glInit(BumpAllocator* transientStorage)
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
         glEnable(GL_DEBUG_OUTPUT);
 
-        glContext.pointProgramID = glCreatePointProgram(transientStorage);
+        glContext.pointProgramID = glCreateShaderProgram(transientStorage, POINT_PROGRAM_NAME);
         glContext.computeProgramID = glCreateComputeProgram(transientStorage);
+        glContext.voxelProgramID = glCreateShaderProgram(transientStorage, VOXEL_PROGRAM_NAME);
 
-        if(!glContext.pointProgramID || !glContext.computeProgramID) return false;
+        if(!glContext.pointProgramID   || 
+           !glContext.computeProgramID ||
+           !glContext.voxelProgramID)  return false;
+
         glContext.pointShaderTimestamp = max
                                         (
-                                                getTimestamp("assets/shaders/IFS.comp"),
+                                                max(getTimestamp("assets/shaders/IFS.comp"),
+                                                    getTimestamp("assets/shaders/voxel_cube.frag")),
                                                 max(getTimestamp("assets/shaders/point_cloud.vert"),
                                                     getTimestamp("assets/shaders/point_cloud.frag"))
                                         );
@@ -233,7 +239,7 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 timestampFrag > glContext.pointShaderTimestamp ||
                 timestampCompute > glContext.pointShaderTimestamp)
                 {
-                        GLuint programID = glCreatePointProgram(transientStorage);
+                        GLuint programID = glCreateShaderProgram(transientStorage, POINT_PROGRAM_NAME);
                         GLuint computeProgramID = glCreateComputeProgram(transientStorage);
 
                         if(programID && computeProgramID)
@@ -243,17 +249,6 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
                                 glContext.pointProgramID = programID;
                                 glContext.computeProgramID = computeProgramID;
-                                glContext.projectionID = glGetUniformLocation(programID, "cameraSpaceTransform");
-                                glContext.computePointCountID = glGetUniformLocation(computeProgramID, "pointCount");
-                                glContext.computeTimeID = glGetUniformLocation(computeProgramID, "TIME");
-                                glContext.computeMatrixCountID = glGetUniformLocation(computeProgramID, "matrixCount");
-                                glContext.pointShaderTimestamp = max(timestampCompute,
-                                                                max(timestampVert, timestampFrag));
-                        }
-                        else
-                        {
-                                if(programID) glDeleteProgram(programID);
-                                if(computeProgramID) glDeleteProgram(computeProgramID);
                         }
                 }
                 
@@ -293,7 +288,7 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
         glDispatchCompute(workGroupCount, 1, 1);
 
-        //glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);  // Do I even need this?
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);  // Do I even need this?
 
         // Use base vertex + fragment shader to draw computed points
         {        
@@ -303,7 +298,6 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 float top = camera.nearPlane * tanf(degToRad(camera.fov / 2.0f));
                 float right = top * ((float)input->screenSize.x / input->screenSize.y);
 
-                camera.position.z = 2.0f;
                 mat4 projection = perspectiveProjection(-right, right, top, -top, camera.nearPlane, camera.farPlane);
                 mat4 view = translationMatrix(camera.position * -1.0f);
 
