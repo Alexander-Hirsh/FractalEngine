@@ -8,23 +8,31 @@
 /// ##############################################################################################
 struct GLContext
 {
+        // Programs
         GLuint pointProgramID;
         GLuint computeProgramID;
         GLuint voxelProgramID;
 
+        // SSBO Buffers
         GLuint pointVertexArrayID;
         GLuint pointBufferID;
         GLuint matrixBufferID;
         GLuint AOgridBufferID;
 
+        // Point cloud uniforms
         GLuint projectionID;
-
         GLuint vertexAOgridSizeID;
 
+        // Compute uniforms
         GLuint computeTimeID;
         GLuint computePointCountID;
         GLuint computeMatrixCountID;
         GLuint computeAOgridSizeID;
+
+        // Voxel Debug uniforms
+        GLuint vd_projectMatID;
+
+        // Timestamps
         long long pointShaderTimestamp;
 };
 
@@ -211,13 +219,18 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, glContext.AOgridBufferID);
         }
 
-        glContext.projectionID = glGetUniformLocation(glContext.pointProgramID, "cameraSpaceTransform");
-        glContext.vertexAOgridSizeID = glGetUniformLocation(glContext.pointProgramID, "AOgridSize");
-
+        // Compute uniforms
         glContext.computeTimeID = glGetUniformLocation(glContext.computeProgramID, "TIME");
         glContext.computePointCountID = glGetUniformLocation(glContext.computeProgramID, "pointCount");
         glContext.computeMatrixCountID = glGetUniformLocation(glContext.computeProgramID, "matrixCount");
         glContext.computeAOgridSizeID = glGetUniformLocation(glContext.computeProgramID, "AOgridSize");
+
+        // Point cloud uniforms
+        glContext.projectionID = glGetUniformLocation(glContext.pointProgramID, "cameraSpaceTransform");
+        glContext.vertexAOgridSizeID = glGetUniformLocation(glContext.pointProgramID, "AOgridSize");
+
+        // Voxel debug uniforms
+        glContext.vd_projectMatID = glGetUniformLocation(glContext.voxelProgramID, "projectionMatrix");
 
 
         glEnable(GL_FRAMEBUFFER_SRGB);
@@ -262,12 +275,21 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 return;
         }
 
+        // Update matricies
         ifs.generateTransformMatrix(deltaTime);
+
+        Camera3D& camera = renderData->gameCamera;
+        float top = camera.nearPlane * tanf(degToRad(camera.fov / 2.0f));
+        float right = top * ((float)input->screenSize.x / input->screenSize.y);
+
+        mat4 projection = perspectiveProjection(-right, right, top, -top, camera.nearPlane, camera.farPlane);
+        mat4 view = translationMatrix(camera.position * -1.0f);
+
+        mat4 cameraSpaceTransform = projection * view;
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, input->screenSize.x, input->screenSize.y);
-
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
@@ -278,31 +300,33 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                         (GLsizeiptr)(sizeof(mat4) * ifs.currNumOfMatrix),
                         ifs.IFSMatrices);
 
-        glUseProgram(glContext.computeProgramID);
-        glUniform1i(glContext.computePointCountID, renderData->pointCount);
-        glUniform1f(glContext.computeTimeID, timeSeconds);
-        glUniform1i(glContext.computeMatrixCountID, ifs.currNumOfMatrix);
+        // Compute point cloud positions
+        {        
+                glUseProgram(glContext.computeProgramID);
+                glUniform1i(glContext.computePointCountID, renderData->pointCount);
+                glUniform1f(glContext.computeTimeID, timeSeconds);
+                glUniform1i(glContext.computeMatrixCountID, ifs.currNumOfMatrix);
 
-        GLuint workGroupCount = (renderData->pointCount + POINT_COMPUTE_LOCAL_SIZE - 1) /
-                                                POINT_COMPUTE_LOCAL_SIZE;
+                GLuint workGroupCount = (renderData->pointCount + POINT_COMPUTE_LOCAL_SIZE - 1) /
+                                                        POINT_COMPUTE_LOCAL_SIZE;
 
-        glDispatchCompute(workGroupCount, 1, 1);
+                glDispatchCompute(workGroupCount, 1, 1);
 
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);  // Do I even need this?
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);  // Do I even need this?
+        }
 
-        // Use base vertex + fragment shader to draw computed points
+        // Draw Debug voxel grid
+        {
+                glUseProgram(glContext.voxelProgramID);
+
+                glUniformMatrix4fv(glContext.vd_projectMatID, 1, GL_FALSE, &cameraSpaceTransform.ax);
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+
+        // Use point cloud program to draw computed points
         {        
                 glUseProgram(glContext.pointProgramID);
-
-                Camera3D& camera = renderData->gameCamera;
-                float top = camera.nearPlane * tanf(degToRad(camera.fov / 2.0f));
-                float right = top * ((float)input->screenSize.x / input->screenSize.y);
-
-                mat4 projection = perspectiveProjection(-right, right, top, -top, camera.nearPlane, camera.farPlane);
-                mat4 view = translationMatrix(camera.position * -1.0f);
-
-                mat4 cameraSpaceTransform = projection * view;
-
+                
                 glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, &cameraSpaceTransform.ax);
                 glUniform1i(glContext.vertexAOgridSizeID, AO_GRID_SIDE_SIZE);
 
