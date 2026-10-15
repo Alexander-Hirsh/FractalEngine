@@ -1,5 +1,7 @@
 #pragma once
 
+#define муся vec3
+
 #include <stdio.h>
 #include <stdlib.h>     // For malloc
 #include <string.h>     // For memset
@@ -579,6 +581,20 @@ struct vec3
         }
 };
 
+vec3 normalize(vec3 v)
+{
+        float len = sqrt(v.x * v.x + v.y * v.y + v.z  * v.z);
+        if (len > 0.0f) {
+                return { v.x / len, v.y / len, v.z / len };
+        }else return {0.0f, 0.0f, 0.0f};
+}
+
+vec3 cross(vec3 a, vec3 b)
+{
+        return {a.y * b.z - a.z * b.y,
+                a.z * b.x - a.x * b.z,
+                a.x * b.y - a.y * b.x};
+}
 
 struct vec4
 {
@@ -743,10 +759,24 @@ mat4 perspectiveProjection(float left, float right, float top, float bottom,
         return result;
 }
 
-
-float degToRad(float d)
+mat4 lookAt(vec3 forward, vec3 right, vec3 up)
 {
-        return d * 0.0174533f;
+        mat4 result = {};
+
+        result[0][0] = right.x;
+        result[1][0] = right.y;
+        result[2][0] = right.z;
+
+        result[0][1] = up.x;
+        result[1][1] = up.y;
+        result[2][1] = up.z;
+
+        result[0][2] = -forward.x;
+        result[1][2] = -forward.y;
+        result[2][2] = -forward.z;
+        result[3][3] = 1.0f;
+
+        return result;
 }
 
 mat4 scaleMatrix(vec3 scale)
@@ -848,4 +878,13 @@ void vec3Lerp(vec3& a, vec3 b, float t, float dt)
                         lerpSmooth(a.y, b.y, t, dt),
                         lerpSmooth(a.z, b.z, t, dt)
                 );
+}
+
+
+/// ##############################################################################################
+///                                     Conversions
+/// ##############################################################################################
+float degToRad(float d)
+{
+        return d * 0.0174533f;
 }

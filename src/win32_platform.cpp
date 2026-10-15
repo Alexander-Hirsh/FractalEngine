@@ -337,6 +337,10 @@ void platformUpdateWindow()
 
                 input->mousePos.x = point.x;
                 input->mousePos.y = point.y;
+
+                input->relMousePos.x = point.x - input->prevMousePos.x;
+                input->relMousePos.y = point.y - input->prevMousePos.y;
+                input->prevMousePos = input->mousePos;
         }
 }
 

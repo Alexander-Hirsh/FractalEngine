@@ -192,7 +192,7 @@ bool glInit(BumpAllocator* transientStorage)
                 vec4* initialPoints = (vec4*)bumpAlloc(transientStorage, sizeof(vec4) * MAX_POINTS);
                 for(int i = 0; i < MAX_POINTS; i++)
                 {
-                        initialPoints[i] = {0.0f, 0.0f, 0.0f, 1.0f};
+                        initialPoints[i] = {rng_f(), rng_f(), rng_f(), 1.0f};
                 }
 
                 glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vec4) * MAX_POINTS,
@@ -279,11 +279,13 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
         ifs.generateTransformMatrix(deltaTime);
 
         Camera3D& camera = renderData->gameCamera;
-        float top = camera.nearPlane * tanf(degToRad(camera.fov / 2.0f));
-        float right = top * ((float)input->screenSize.x / input->screenSize.y);
 
-        mat4 projection = perspectiveProjection(-right, right, top, -top, camera.nearPlane, camera.farPlane);
-        mat4 view = translationMatrix(camera.position * -1.0f);
+        float top = camera.nearPlane * tanf(degToRad(camera.fov / 2.0f));
+        float halfWidth = top * ((float)input->screenSize.x / input->screenSize.y);
+
+        mat4 projection = perspectiveProjection(-halfWidth, halfWidth, top, -top, camera.nearPlane, camera.farPlane);
+        mat4 view = lookAt(camera.forward, camera.right * -1.0f, camera.up * -1.0f) *
+                    translationMatrix(camera.position * -1.0f);
 
         mat4 cameraSpaceTransform = projection * view;
 
@@ -312,15 +314,16 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
                 glDispatchCompute(workGroupCount, 1, 1);
 
-                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);  // Do I even need this?
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
 
         // Draw Debug voxel grid
         {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 glUseProgram(glContext.voxelProgramID);
 
                 glUniformMatrix4fv(glContext.vd_projectMatID, 1, GL_FALSE, &cameraSpaceTransform.ax);
-                glDrawArrays(GL_TRIANGLES, 0, 36);
+                //glDrawArrays(GL_TRIANGLES, 0, 36);
         }
 
         // Use point cloud program to draw computed points

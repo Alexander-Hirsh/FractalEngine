@@ -104,6 +104,8 @@ int main()
                         ifs.generateNewParameters();
                 }
 
+                renderData->gameCamera.updateCamera(*input);
+
                 glRender(&transientStorage, ifs, deltaTime, timeSeconds);
 
                 platformSwapBuffers();

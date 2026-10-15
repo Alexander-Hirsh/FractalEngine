@@ -29,11 +29,40 @@ const char* VOXEL_PROGRAM_NAME = "voxel_cube";
 struct Camera3D
 {
         float zoom = 1.0f;
-        vec3 position = vec3(0.5, 0.5, 4.0);
+        vec3 position = vec3(0.0f, 0.0f, 2.5f);
+        float yaw = 0.0f;
+        float pitch = 0.0f;
+        float distance = 2.5f;
+
+        vec3 fpoint = vec3(0.0, 0.0, 0.0);
+        vec3 forward, right, up;
+
         float fov = 90.0f;
 
         float nearPlane = 0.1f;
         float farPlane = 100.0f;
+
+        void updateCamera(const Input& input)
+        {
+                if(input.keys[KEY_MOUSE_RIGHT].isDown &&
+                   !input.keys[KEY_MOUSE_RIGHT].justPressed)
+                {
+                        constexpr float mouseSensitivity = 0.005f;
+                        float maxPitch = degToRad(89.0f);
+                        yaw += input.relMousePos.x * mouseSensitivity;
+                        pitch -= input.relMousePos.y * mouseSensitivity;
+                        if(pitch > maxPitch) pitch = maxPitch;
+                        if(pitch < -maxPitch) pitch = -maxPitch;
+                }
+
+                float horizontalDistance = distance * cosf(pitch);
+                position = fpoint + vec3(horizontalDistance * sinf(yaw),
+                                         distance * sinf(pitch),
+                                         horizontalDistance * cosf(yaw));
+                forward = normalize(fpoint - position);
+                right = normalize(cross(forward, vec3(0.0f, 1.0f, 0.0f)));
+                up = cross(right, forward);
+        }
 };
 
 struct RenderData
@@ -72,7 +101,7 @@ struct IFS
                 for(int i = 0; i < currNumOfMatrix; i++)
                 {
                         newScale[i] = randVec3(0.65f, 0.75f);
-                        newRotation[i] = randVec3(-degToRad(40), degToRad(40));
+                        newRotation[i] = randVec3(degToRad(-30), degToRad(30));
                         newShear[i] = randVec3(-0.1f, 0.1f);
                         newTranslation[i] = randVec3(0.0f, 1.0f);
                 }
