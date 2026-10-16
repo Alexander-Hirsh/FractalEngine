@@ -12,6 +12,7 @@ struct GLContext
         GLuint pointProgramID;
         GLuint computeProgramID;
         GLuint voxelProgramID;
+        GLuint boundsProgramID;
 
         // SSBO Buffers
         GLuint pointVertexArrayID;
@@ -97,8 +98,12 @@ GLuint glShaderInit(int shaderType, const char* shaderPath, BumpAllocator* trans
 
 GLuint glCreateShaderProgram(BumpAllocator* transientStorage, const char* shaderName)
 {
-        GLuint vertShaderID = glShaderInit(GL_VERTEX_SHADER,   (std::string("assets/shaders/") + shaderName + std::string(".vert")).c_str(), transientStorage);
-        GLuint fragShaderID = glShaderInit(GL_FRAGMENT_SHADER, (std::string("assets/shaders/") + shaderName + std::string(".frag")).c_str(), transientStorage);
+        GLuint vertShaderID = glShaderInit(GL_VERTEX_SHADER,   
+                (std::string("/FractalEngine/assets/shaders/") + shaderName + std::string(".vert")).c_str(), 
+                transientStorage);
+        GLuint fragShaderID = glShaderInit(GL_FRAGMENT_SHADER, 
+                (std::string("/FractalEngine/assets/shaders/") + shaderName + std::string(".frag")).c_str(), 
+                transientStorage);
 
         if(!vertShaderID || !fragShaderID)
         {
@@ -130,9 +135,11 @@ GLuint glCreateShaderProgram(BumpAllocator* transientStorage, const char* shader
         return programID;
 }
 
-GLuint glCreateComputeProgram(BumpAllocator* transientStorage)
+GLuint glCreateComputeProgram(BumpAllocator* transientStorage, const char* shaderName)
 {
-        GLuint compShaderID = glShaderInit(GL_COMPUTE_SHADER, "assets/shaders/IFS.comp", transientStorage);
+        GLuint compShaderID = glShaderInit(GL_COMPUTE_SHADER,
+                (std::string("/FractalEngine/assets/shaders/") + shaderName + std::string(".comp")).c_str(),
+                transientStorage);
 
         if(!compShaderID) return 0;
 
@@ -164,9 +171,10 @@ bool glInit(BumpAllocator* transientStorage)
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
         glEnable(GL_DEBUG_OUTPUT);
 
-        glContext.pointProgramID = glCreateShaderProgram(transientStorage, POINT_PROGRAM_NAME);
-        glContext.computeProgramID = glCreateComputeProgram(transientStorage);
-        glContext.voxelProgramID = glCreateShaderProgram(transientStorage, VOXEL_PROGRAM_NAME);
+        glContext.pointProgramID   = glCreateShaderProgram (transientStorage, POINT_PROGRAM_NAME);
+        glContext.computeProgramID = glCreateComputeProgram(transientStorage, IFS_PROGRAM_NAME);
+        glContext.voxelProgramID   = glCreateShaderProgram (transientStorage, VOXEL_PROGRAM_NAME);
+        //glContext.boundsProgramID  = glCreateComputeProgram(transientStorage, BOUND_PROGRAM_NAME);
 
         if(!glContext.pointProgramID   || 
            !glContext.computeProgramID ||
@@ -192,7 +200,7 @@ bool glInit(BumpAllocator* transientStorage)
                 vec4* initialPoints = (vec4*)bumpAlloc(transientStorage, sizeof(vec4) * MAX_POINTS);
                 for(int i = 0; i < MAX_POINTS; i++)
                 {
-                        initialPoints[i] = {rng_f(), rng_f(), rng_f(), 1.0f};
+                        initialPoints[i] = {0.0, 0.0, 0.0, 1.0f};
                 }
 
                 glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vec4) * MAX_POINTS,
@@ -244,7 +252,7 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 {
         // HOT SHADER RELOADING
         {
-                long long timestampVert = getTimestamp("assets/shaders/point_cloud.vert");
+                long long timestampVert = getTimestamp("H:/FractalEngine/assets/shaders/point_cloud.vert");
                 long long timestampFrag = getTimestamp("assets/shaders/point_cloud.frag");
                 long long timestampCompute = getTimestamp("assets/shaders/IFS.comp");
 
@@ -253,7 +261,7 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 timestampCompute > glContext.pointShaderTimestamp)
                 {
                         GLuint programID = glCreateShaderProgram(transientStorage, POINT_PROGRAM_NAME);
-                        GLuint computeProgramID = glCreateComputeProgram(transientStorage);
+                        GLuint computeProgramID = glCreateComputeProgram(transientStorage, IFS_PROGRAM_NAME);
 
                         if(programID && computeProgramID)
                         {
@@ -315,6 +323,12 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 glDispatchCompute(workGroupCount, 1, 1);
 
                 glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        }
+
+        // Compute IFS AA bounding box
+        {
+                //glUseProgram(glContext.boundsProgramID);
+
         }
 
         // Draw Debug voxel grid

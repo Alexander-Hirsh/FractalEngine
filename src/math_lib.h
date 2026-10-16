@@ -57,9 +57,9 @@ enum TextColor
 
 template <typename ...Args>
 
-void _log(char* prefix, char* msg, TextColor textColor, Args... args)
+void _log(const char* prefix, const char* msg, TextColor textColor, Args... args)
 {
-        static char* TextColorTable[TEXT_COLOR_COUNT] = 
+        static const char* TextColorTable[TEXT_COLOR_COUNT] = 
         {    
                 "\x1b[30m", // TEXT_COLOR_BLACK
                 "\x1b[31m", // TEXT_COLOR_RED
@@ -785,7 +785,7 @@ mat4 scaleMatrix(vec3 scale)
         result.ax = scale.x;
         result.by = scale.y;
         result.cz = scale.z;
-        result.dw = 1;
+        result.dw = 1.0f;
 
         return result;
 }
@@ -809,7 +809,7 @@ mat4 rotationMatrix(vec3 rot)
         result.cy = sin(x) * cos(z) + cos(x) * sin(y) * sin(z); 
         result.cz = cos(x) * cos(y);
 
-        result.dw = 1;
+        result.dw = 1.0f;
 
         return result;
 }
@@ -848,7 +848,8 @@ mat4 translationMatrix(vec3 translation)
         result.aw = translation.x;
         result.bw = translation.y;
         result.cw = translation.z;
-        result.dw = 1;
+        
+        result.dw = 1.0f;
 
         return result;
 }

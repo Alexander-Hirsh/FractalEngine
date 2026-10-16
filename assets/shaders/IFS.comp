@@ -59,8 +59,6 @@ const int indices[edgeCount] =
     3, 7
 };
 
-
-
 uint lowbias32(uint x)
 {
         x ^= x >> 16;
@@ -70,7 +68,6 @@ uint lowbias32(uint x)
         x ^= x >> 16;
         return x;
 }
-
 
 void main()
 {
@@ -90,18 +87,22 @@ void main()
 
         points[pID] = point;
         
-        for (int i = 0; i < edgeCount; i++)
-        {
-                vec3 start = vertices[indices[i * 2]];
-                vec3 end   = vertices[indices[i * 2 + 1]];
+        // for(int m = 0; m < matrixCount; m++)
+        // {
+        //         for (int i = 0; i < edgeCount; i++)
+        //         {
+        //                 vec3 start = vec3(IFSMatrices[m] * (vec4((vertices[indices[i * 2]]), 1.0)));
+        //                 vec3 end   = vec3(IFSMatrices[m] * (vec4((vertices[indices[i * 2 + 1]]), 1.0)));
 
-                for (int l = 0; l < sideLength; l++)
-                {
-                        float t = float(l) / float(sideLength);
+        //                 for (int l = 0; l < sideLength; l++)
+        //                 {
+        //                         float t = float(l) / float(sideLength);
 
-                        points[i * sideLength + l] = vec4(mix(start, end, t), 1.0f);
-                }
-        }
+        //                         points[(i * sideLength + l) * (m + 1)] = vec4(mix(start, end, t), 1.0f);
+        //                 }
+        //         }
+        // }
+
 
         //points[pID].x += float(pID) * 0.00001;
         //points[pID].x += 0.001;

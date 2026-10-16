@@ -21,6 +21,8 @@ static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_CO
 
 const char* POINT_PROGRAM_NAME = "point_cloud";
 const char* VOXEL_PROGRAM_NAME = "voxel_cube";
+const char* IFS_PROGRAM_NAME = "IFS";
+const char* BOUND_PROGRAM_NAME = "bounds_compute";
 
 
 /// ##############################################################################################
@@ -78,7 +80,7 @@ struct RenderData
 struct IFS
 {
         int currNumOfMatrix = 0;
-        static const int maxNumOfMatrix = 4;
+        static const int maxNumOfMatrix = 2;
 
         vec3 currScale[maxNumOfMatrix] = {};
         vec3 currRotation[maxNumOfMatrix] = {};

@@ -12,7 +12,7 @@ static KeyCodeID KeyCodeLookupTable[KEY_COUNT];
 /// ##############################################################################################
 bool platformCreateWindow(int width, int height, const wchar_t* title);
 void platformUpdateWindow();
-void* platformLoadGlFunction(char* name);
+void* platformLoadGlFunction(const char* name);
 void platformSwapBuffers();
 
 void* platformLoadDynamicLibrary(char* dll);

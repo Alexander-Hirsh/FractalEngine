@@ -4,14 +4,38 @@
         {
             "label": "Build",
             "type": "shell",
-            "windows":
-            {
+            "windows": {
                 "command": "sh build.sh"
             },
-            "linux":
-            {
-                "command": "./build.sh",
+            "linux": {
+                "command": "./build.sh"
             },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "type": "cppbuild",
+            "label": "Build FractalEngine",
+            "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "-std=c++23",
+                "-I${workspaceFolder}/lib",
+                "${workspaceFolder}/src/main.cpp",
+                "${workspaceFolder}/src/rng.cpp",
+                "-o",
+                "${workspaceFolder}/main.exe",
+                "-lopengl32",
+                "-lgdi32",
+                "-luser32"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": ["$gcc"],
             "group": {
                 "kind": "build",
                 "isDefault": true

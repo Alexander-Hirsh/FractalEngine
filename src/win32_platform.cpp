@@ -2,7 +2,7 @@
 #include "math_lib.h"
 
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
+//#define NOMINMAX
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #define UNICODE
@@ -349,7 +349,7 @@ void platformSwapBuffers()
         SwapBuffers(dc);
 }
 
-void* platformLoadGlFunction(char* name)
+void* platformLoadGlFunction(const char* name)
 {
         PROC proc = wglGetProcAddress(name);
 
