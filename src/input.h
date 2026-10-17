@@ -92,6 +92,8 @@ struct Input
         vec2 mousePos;
         vec2 relMousePos;
 
+        int mouseWheelDelta = 0;
+
         Key keys[KEY_COUNT];
 };
 

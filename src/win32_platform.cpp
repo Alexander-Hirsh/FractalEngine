@@ -95,6 +95,11 @@ LRESULT CALLBACK WindowsWindowsCallback(HWND window, UINT msg, WPARAM wParam, LP
 
                 break;
         }
+        case WM_MOUSEWHEEL:
+        {
+                input->mouseWheelDelta += GET_WHEEL_DELTA_WPARAM(wParam);
+                break;
+        }
 
         default:
                 {
@@ -314,6 +319,7 @@ bool platformCreateWindow(int width, int height, const wchar_t* title)
 void platformUpdateWindow()
 {
         // Flush all previous inputs
+        input->mouseWheelDelta = 0;
         for (int keyCode = 0; keyCode < KEY_COUNT; keyCode++)
         {
                 input->keys[keyCode].justReleased = false;

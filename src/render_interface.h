@@ -9,10 +9,13 @@
 /// ##############################################################################################
 ///                                     Render Constants
 /// ##############################################################################################
-constexpr uint64_t MAX_POINTS = 1000000;
+constexpr uint64_t MAX_POINTS = 5000000;
+constexpr int BOUNDS_DEBUG_VERTEX_COUNT = 24;
 constexpr int POINT_COMPUTE_LOCAL_SIZE = 256;
 constexpr uint64_t MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
-constexpr int AO_GRID_SIDE_SIZE = 32;
+constexpr int AO_GRID_SIDE_SIZE = 64;
+constexpr uint64_t AO_GRID_CELL_COUNT =
+        uint64_t(AO_GRID_SIDE_SIZE) * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE;
 
 constexpr int RENDER_WIDTH = 1920/1.5;
 constexpr int RENDER_HEIGHT = 1080/1.5;
@@ -31,10 +34,10 @@ const char* BOUND_PROGRAM_NAME = "bounds_compute";
 struct Camera3D
 {
         float zoom = 1.0f;
-        vec3 position = vec3(0.0f, 0.0f, 2.5f);
+        vec3 position;
         float yaw = 0.0f;
         float pitch = 0.0f;
-        float distance = 2.5f;
+        float distance = 1.5f;
 
         vec3 fpoint = vec3(0.0, 0.0, 0.0);
         vec3 forward, right, up;
@@ -46,8 +49,7 @@ struct Camera3D
 
         void updateCamera(const Input& input)
         {
-                if(input.keys[KEY_MOUSE_RIGHT].isDown &&
-                   !input.keys[KEY_MOUSE_RIGHT].justPressed)
+                if(input.keys[KEY_MOUSE_RIGHT].isDown)
                 {
                         constexpr float mouseSensitivity = 0.005f;
                         float maxPitch = degToRad(89.0f);
@@ -56,6 +58,12 @@ struct Camera3D
                         if(pitch > maxPitch) pitch = maxPitch;
                         if(pitch < -maxPitch) pitch = -maxPitch;
                 }
+
+                constexpr float zoomPerNotch = 0.1f;
+                float wheelNotches = (float)input.mouseWheelDelta / 120.0f;
+                distance -= wheelNotches * zoomPerNotch;
+                if(distance < 0.1f) distance = 0.1f;
+                if(distance > 100.0f) distance = 100.0f;
 
                 float horizontalDistance = distance * cosf(pitch);
                 position = fpoint + vec3(horizontalDistance * sinf(yaw),
@@ -80,7 +88,7 @@ struct RenderData
 struct IFS
 {
         int currNumOfMatrix = 0;
-        static const int maxNumOfMatrix = 2;
+        static const int maxNumOfMatrix = 5;
 
         vec3 currScale[maxNumOfMatrix] = {};
         vec3 currRotation[maxNumOfMatrix] = {};
@@ -94,7 +102,7 @@ struct IFS
 
         mat4 IFSMatrices[maxNumOfMatrix] = {};
 
-        float iCurve = 0.9975f;
+        float iCurve = 0.5995f;
 
         void generateNewParameters()
         {

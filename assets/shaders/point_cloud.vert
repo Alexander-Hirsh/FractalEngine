@@ -6,9 +6,9 @@ layout(std430, binding = 0) readonly buffer PointBuffer
         vec4 points[];
 };
 
-layout(std430, binding = 2) buffer AOGridBuffer
+layout(std430, binding = 2) readonly buffer AOGridBuffer
 {
-        bool AOgrid[];
+        uint AOgrid[];
 };
 
 // Uniforms
@@ -23,30 +23,29 @@ void main()
 {
         vec4 point = points[gl_VertexID];
 
-        int gridX = int((point.x + 0.5) * AOgridSize);
-        int gridY = int((point.y + 0.5) * AOgridSize);
-        int gridZ = int((point.z + 0.5) * AOgridSize);
-
+        ivec3 gridCell = ivec3(floor((point.xyz + vec3(0.5)) * float(AOgridSize)));
         int numCellOccupied = 0;
-        for(int x = -1; x <= 1; x++)
+        if(all(greaterThanEqual(gridCell, ivec3(0))) &&
+           all(lessThan(gridCell, ivec3(AOgridSize))))
         {
-                for(int y = -1; y <= 1; y++)
+                for(int x = -1; x <= 1; x++)
                 {
-                        for(int z = -1; z <= 1; z++)
+                        for(int y = -1; y <= 1; y++)
                         {
-                                int pX = x + gridX;
-                                int pY = y + gridY;
-                                int pZ = z + gridZ;
+                                for(int z = -1; z <= 1; z++)
+                                {
+                                        ivec3 neighbor = gridCell + ivec3(x, y, z);
+                                        if(any(lessThan(neighbor, ivec3(0))) ||
+                                           any(greaterThanEqual(neighbor, ivec3(AOgridSize))))
+                                                continue;
 
-                                if(pX < 0 || pX > AOgridSize || 
-                                   pY < 0 || pY > AOgridSize ||
-                                   pZ < 0 || pZ > AOgridSize)
-                                        continue;
-
-                                if(AOgrid[(pX) + AOgridSize * ((pY) + AOgridSize * (pZ))]) 
-                                        numCellOccupied++;
+                                        uint cellIndex = uint(neighbor.x +
+                                                AOgridSize * (neighbor.y + AOgridSize * neighbor.z));
+                                        if(AOgrid[cellIndex] != 0u)
+                                                numCellOccupied++;
+                                }
                         }                
-                }       
+                }
         }
 
         numCellAround = numCellOccupied;

@@ -18,6 +18,7 @@ struct GLContext
         GLuint pointVertexArrayID;
         GLuint pointBufferID;
         GLuint matrixBufferID;
+        GLuint boundsBufferID;
         GLuint AOgridBufferID;
 
         // Point cloud uniforms
@@ -30,11 +31,15 @@ struct GLContext
         GLuint computeMatrixCountID;
         GLuint computeAOgridSizeID;
 
+        //Bounds uniforms
+        GLuint boundsMatrixCountID;
+
         // Voxel Debug uniforms
         GLuint vd_projectMatID;
 
         // Timestamps
         long long pointShaderTimestamp;
+        long long boundsShaderTimestamp;
 };
 
 
@@ -42,6 +47,7 @@ struct GLContext
 ///                                     OpenGl Globals
 /// ##############################################################################################
 static GLContext glContext;
+static const uint32_t emptyAOGrid[AO_GRID_CELL_COUNT] = {};
 
 
 /// ##############################################################################################
@@ -99,10 +105,10 @@ GLuint glShaderInit(int shaderType, const char* shaderPath, BumpAllocator* trans
 GLuint glCreateShaderProgram(BumpAllocator* transientStorage, const char* shaderName)
 {
         GLuint vertShaderID = glShaderInit(GL_VERTEX_SHADER,   
-                (std::string("/FractalEngine/assets/shaders/") + shaderName + std::string(".vert")).c_str(), 
+                (std::string("assets/shaders/") + shaderName + std::string(".vert")).c_str(), 
                 transientStorage);
         GLuint fragShaderID = glShaderInit(GL_FRAGMENT_SHADER, 
-                (std::string("/FractalEngine/assets/shaders/") + shaderName + std::string(".frag")).c_str(), 
+                (std::string("assets/shaders/") + shaderName + std::string(".frag")).c_str(), 
                 transientStorage);
 
         if(!vertShaderID || !fragShaderID)
@@ -138,7 +144,7 @@ GLuint glCreateShaderProgram(BumpAllocator* transientStorage, const char* shader
 GLuint glCreateComputeProgram(BumpAllocator* transientStorage, const char* shaderName)
 {
         GLuint compShaderID = glShaderInit(GL_COMPUTE_SHADER,
-                (std::string("/FractalEngine/assets/shaders/") + shaderName + std::string(".comp")).c_str(),
+                (std::string("assets/shaders/") + shaderName + std::string(".comp")).c_str(),
                 transientStorage);
 
         if(!compShaderID) return 0;
@@ -174,11 +180,12 @@ bool glInit(BumpAllocator* transientStorage)
         glContext.pointProgramID   = glCreateShaderProgram (transientStorage, POINT_PROGRAM_NAME);
         glContext.computeProgramID = glCreateComputeProgram(transientStorage, IFS_PROGRAM_NAME);
         glContext.voxelProgramID   = glCreateShaderProgram (transientStorage, VOXEL_PROGRAM_NAME);
-        //glContext.boundsProgramID  = glCreateComputeProgram(transientStorage, BOUND_PROGRAM_NAME);
+        glContext.boundsProgramID  = glCreateComputeProgram(transientStorage, BOUND_PROGRAM_NAME);
 
         if(!glContext.pointProgramID   || 
            !glContext.computeProgramID ||
-           !glContext.voxelProgramID)  return false;
+           !glContext.voxelProgramID   ||
+           !glContext.boundsProgramID) return false;
 
         glContext.pointShaderTimestamp = max
                                         (
@@ -187,23 +194,27 @@ bool glInit(BumpAllocator* transientStorage)
                                                 max(getTimestamp("assets/shaders/point_cloud.vert"),
                                                     getTimestamp("assets/shaders/point_cloud.frag"))
                                         );
+        glContext.boundsShaderTimestamp = getTimestamp("assets/shaders/bounds_compute.comp");
 
 
         glGenVertexArrays(1, &glContext.pointVertexArrayID);
         glBindVertexArray(glContext.pointVertexArrayID);
 
+
+        
         // SUPPLY POINT BUFFER TO COMPUTE SHADER TO WORK ON
         {
                 glGenBuffers(1, &glContext.pointBufferID);
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.pointBufferID);
 
-                vec4* initialPoints = (vec4*)bumpAlloc(transientStorage, sizeof(vec4) * MAX_POINTS);
-                for(int i = 0; i < MAX_POINTS; i++)
+                uint64_t pointBufferCapacity = MAX_POINTS + BOUNDS_DEBUG_VERTEX_COUNT;
+                vec4* initialPoints = (vec4*)bumpAlloc(transientStorage, sizeof(vec4) * pointBufferCapacity);
+                for(uint64_t i = 0; i < pointBufferCapacity; i++)
                 {
                         initialPoints[i] = {0.0, 0.0, 0.0, 1.0f};
                 }
 
-                glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vec4) * MAX_POINTS,
+                glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vec4) * pointBufferCapacity,
                         initialPoints, GL_DYNAMIC_DRAW);
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
         }
@@ -221,11 +232,28 @@ bool glInit(BumpAllocator* transientStorage)
         {
                 glGenBuffers(1, &glContext.AOgridBufferID);
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.AOgridBufferID);
-                glBufferData(GL_SHADER_STORAGE_BUFFER, 
-                             sizeof(bool) * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE,
-                             nullptr, GL_DYNAMIC_DRAW);
+                glBufferData(GL_SHADER_STORAGE_BUFFER,
+                             sizeof(emptyAOGrid), emptyAOGrid, GL_DYNAMIC_DRAW);
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, glContext.AOgridBufferID);
         }
+
+        // SUPPLY AABB BOUNDS BUFFER 
+        {
+                struct BoundsGPU
+                {
+                        vec4 minPoint;
+                        vec4 maxPoint;
+                        uint32_t valid;
+                };
+
+                glGenBuffers(1, &glContext.boundsBufferID);
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.boundsBufferID);
+                glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(BoundsGPU),
+                             nullptr, GL_DYNAMIC_DRAW);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, glContext.boundsBufferID);
+        }
+
+
 
         // Compute uniforms
         glContext.computeTimeID = glGetUniformLocation(glContext.computeProgramID, "TIME");
@@ -236,6 +264,9 @@ bool glInit(BumpAllocator* transientStorage)
         // Point cloud uniforms
         glContext.projectionID = glGetUniformLocation(glContext.pointProgramID, "cameraSpaceTransform");
         glContext.vertexAOgridSizeID = glGetUniformLocation(glContext.pointProgramID, "AOgridSize");
+
+        // Bounds compute uniforms
+        glContext.boundsMatrixCountID = glGetUniformLocation(glContext.boundsProgramID, "matrixCount");
 
         // Voxel debug uniforms
         glContext.vd_projectMatID = glGetUniformLocation(glContext.voxelProgramID, "projectionMatrix");
@@ -252,9 +283,10 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 {
         // HOT SHADER RELOADING
         {
-                long long timestampVert = getTimestamp("H:/FractalEngine/assets/shaders/point_cloud.vert");
+                long long timestampVert = getTimestamp("assets/shaders/point_cloud.vert");
                 long long timestampFrag = getTimestamp("assets/shaders/point_cloud.frag");
                 long long timestampCompute = getTimestamp("assets/shaders/IFS.comp");
+                long long timestampBounds = getTimestamp("assets/shaders/bounds_compute.comp");
 
                 if(timestampVert > glContext.pointShaderTimestamp ||
                 timestampFrag > glContext.pointShaderTimestamp ||
@@ -270,6 +302,35 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
                                 glContext.pointProgramID = programID;
                                 glContext.computeProgramID = computeProgramID;
+                                glContext.projectionID = glGetUniformLocation(
+                                        glContext.pointProgramID, "cameraSpaceTransform");
+                                glContext.vertexAOgridSizeID = glGetUniformLocation(
+                                        glContext.pointProgramID, "AOgridSize");
+                                glContext.computeTimeID = glGetUniformLocation(
+                                        glContext.computeProgramID, "TIME");
+                                glContext.computePointCountID = glGetUniformLocation(
+                                        glContext.computeProgramID, "pointCount");
+                                glContext.computeMatrixCountID = glGetUniformLocation(
+                                        glContext.computeProgramID, "matrixCount");
+                                glContext.computeAOgridSizeID = glGetUniformLocation(
+                                        glContext.computeProgramID, "AOgridSize");
+                                glContext.pointShaderTimestamp = max(
+                                        max(timestampVert, timestampFrag),
+                                        timestampCompute);
+                        }
+                }
+
+                if(timestampBounds > glContext.boundsShaderTimestamp)
+                {
+                        GLuint boundsProgramID = glCreateComputeProgram(
+                                transientStorage, BOUND_PROGRAM_NAME);
+                        if(boundsProgramID)
+                        {
+                                glDeleteProgram(glContext.boundsProgramID);
+                                glContext.boundsProgramID = boundsProgramID;
+                                glContext.boundsMatrixCountID = glGetUniformLocation(
+                                        glContext.boundsProgramID, "matrixCount");
+                                glContext.boundsShaderTimestamp = timestampBounds;
                         }
                 }
                 
@@ -310,12 +371,29 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                         (GLsizeiptr)(sizeof(mat4) * ifs.currNumOfMatrix),
                         ifs.IFSMatrices);
 
+        // Clear the previous frame's cell occupancy before computing this frame.
+        glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.AOgridBufferID);
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
+                        sizeof(emptyAOGrid), emptyAOGrid);
+
+        // Compute IFS AA bounding box
+        {
+                glUseProgram(glContext.boundsProgramID);
+                glUniform1i(glContext.boundsMatrixCountID, ifs.currNumOfMatrix);
+
+                glDispatchCompute(1, 1, 1);
+
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        }
+
         // Compute point cloud positions
         {        
                 glUseProgram(glContext.computeProgramID);
                 glUniform1i(glContext.computePointCountID, renderData->pointCount);
                 glUniform1f(glContext.computeTimeID, timeSeconds);
                 glUniform1i(glContext.computeMatrixCountID, ifs.currNumOfMatrix);
+                glUniform1i(glContext.computeAOgridSizeID, AO_GRID_SIDE_SIZE);
 
                 GLuint workGroupCount = (renderData->pointCount + POINT_COMPUTE_LOCAL_SIZE - 1) /
                                                         POINT_COMPUTE_LOCAL_SIZE;
@@ -323,12 +401,6 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 glDispatchCompute(workGroupCount, 1, 1);
 
                 glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        }
-
-        // Compute IFS AA bounding box
-        {
-                //glUseProgram(glContext.boundsProgramID);
-
         }
 
         // Draw Debug voxel grid
@@ -349,5 +421,6 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
                 glBindVertexArray(glContext.pointVertexArrayID);
                 glDrawArrays(GL_POINTS, 0, renderData->pointCount);
+                glDrawArrays(GL_LINES, renderData->pointCount, BOUNDS_DEBUG_VERTEX_COUNT);
         }
 }

@@ -11,6 +11,7 @@ void main()
         // vec2 pointCoord = gl_PointCoord * 2.0 - 1.0;
         // if(dot(pointCoord, pointCoord) > 1.0) discard;
 
-        float shade = numCellAround / 27; 
-        fragColor = vec4(1,1,1,1) * shade + 0.1;
+        float occlusion = float(numCellAround) / 27.0;
+        float shade = 1.0 - 0.8 * occlusion;
+        fragColor = vec4(vec3(shade), 1.0);
 }
