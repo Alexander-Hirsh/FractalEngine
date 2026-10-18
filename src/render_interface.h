@@ -13,9 +13,9 @@ constexpr uint64_t MAX_POINTS = 10000000;
 constexpr int BOUNDS_DEBUG_VERTEX_COUNT = 24;
 constexpr int POINT_COMPUTE_LOCAL_SIZE = 256;
 constexpr uint64_t MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
-constexpr int AO_GRID_SIDE_SIZE = 64;
+constexpr int AO_GRID_SIDE_SIZE = 128;
 constexpr uint64_t AO_GRID_CELL_COUNT =
-        uint64_t(AO_GRID_SIDE_SIZE) * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE;
+          uint64_t(AO_GRID_SIDE_SIZE) * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE;
 
 constexpr int RENDER_WIDTH = 1920/1.5;
 constexpr int RENDER_HEIGHT = 1080/1.5;
@@ -89,7 +89,7 @@ struct RenderData
 struct IFS
 {
         int currNumOfMatrix = 0;
-        static const int maxNumOfMatrix = 5;
+        static const int maxNumOfMatrix = 4;
 
         vec3 currScale[maxNumOfMatrix] = {};
         vec3 currRotation[maxNumOfMatrix] = {};
@@ -107,14 +107,14 @@ struct IFS
 
         void generateNewParameters()
         {
-                currNumOfMatrix = (int)(rng_f() * (maxNumOfMatrix - 1)) + 2;
+                currNumOfMatrix = maxNumOfMatrix;//(int)(rng_f() * (maxNumOfMatrix - 1)) + 3;
 
                 for(int i = 0; i < currNumOfMatrix; i++)
                 {
-                        newScale[i] = randVec3(0.65f, 0.75f);
-                        newRotation[i] = randVec3(degToRad(-30), degToRad(30));
-                        newShear[i] = randVec3(-0.1f, 0.1f);
-                        newTranslation[i] = randVec3(0.0f, 1.0f);
+                        newScale[i] = randVec3(0.35f, 0.75f);
+                        newRotation[i] = randVec3(degToRad(-50), degToRad(50));
+                        newShear[i] = randVec3(-0.2f, 0.2f);
+                        newTranslation[i] = randVec3(0.0f, 10.0f);
                 }
         }
 

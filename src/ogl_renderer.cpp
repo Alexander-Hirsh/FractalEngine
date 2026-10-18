@@ -440,7 +440,7 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
                 glDispatchCompute(workGroupCount, 1, 1);
 
-                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
         }
 
         // Draw Debug voxel grid
