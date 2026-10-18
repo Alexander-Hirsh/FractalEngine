@@ -9,7 +9,7 @@
 /// ##############################################################################################
 ///                                     Render Constants
 /// ##############################################################################################
-constexpr uint64_t MAX_POINTS = 5000000;
+constexpr uint64_t MAX_POINTS = 10000000;
 constexpr int BOUNDS_DEBUG_VERTEX_COUNT = 24;
 constexpr int POINT_COMPUTE_LOCAL_SIZE = 256;
 constexpr uint64_t MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
@@ -26,6 +26,7 @@ const char* POINT_PROGRAM_NAME = "point_cloud";
 const char* VOXEL_PROGRAM_NAME = "voxel_cube";
 const char* IFS_PROGRAM_NAME = "IFS";
 const char* BOUND_PROGRAM_NAME = "bounds_compute";
+const char* FULLSCREEN_PROGRAM_NAME = "fullscreen_quad";
 
 
 /// ##############################################################################################

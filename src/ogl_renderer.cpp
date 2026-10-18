@@ -13,6 +13,7 @@ struct GLContext
         GLuint computeProgramID;
         GLuint voxelProgramID;
         GLuint boundsProgramID;
+        GLuint fullscreenProgramID;
 
         // SSBO Buffers
         GLuint pointVertexArrayID;
@@ -20,6 +21,9 @@ struct GLContext
         GLuint matrixBufferID;
         GLuint boundsBufferID;
         GLuint AOgridBufferID;
+        
+        GLuint FBOID;
+        GLuint RBOID;
 
         // Point cloud uniforms
         GLuint projectionID;
@@ -36,6 +40,12 @@ struct GLContext
 
         // Voxel Debug uniforms
         GLuint vd_projectMatID;
+
+        // Post processing uniforms
+        GLuint pp_framebufferTextureID;
+
+        // Texture IDs
+        GLuint framebufferTextureID;
 
         // Timestamps
         long long pointShaderTimestamp;
@@ -177,15 +187,17 @@ bool glInit(BumpAllocator* transientStorage)
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
         glEnable(GL_DEBUG_OUTPUT);
 
-        glContext.pointProgramID   = glCreateShaderProgram (transientStorage, POINT_PROGRAM_NAME);
-        glContext.computeProgramID = glCreateComputeProgram(transientStorage, IFS_PROGRAM_NAME);
-        glContext.voxelProgramID   = glCreateShaderProgram (transientStorage, VOXEL_PROGRAM_NAME);
-        glContext.boundsProgramID  = glCreateComputeProgram(transientStorage, BOUND_PROGRAM_NAME);
+        glContext.pointProgramID      = glCreateShaderProgram (transientStorage, POINT_PROGRAM_NAME);
+        glContext.computeProgramID    = glCreateComputeProgram(transientStorage, IFS_PROGRAM_NAME);
+        glContext.voxelProgramID      = glCreateShaderProgram (transientStorage, VOXEL_PROGRAM_NAME);
+        glContext.boundsProgramID     = glCreateComputeProgram(transientStorage, BOUND_PROGRAM_NAME);
+        glContext.fullscreenProgramID = glCreateShaderProgram (transientStorage, FULLSCREEN_PROGRAM_NAME);
 
         if(!glContext.pointProgramID   || 
            !glContext.computeProgramID ||
            !glContext.voxelProgramID   ||
-           !glContext.boundsProgramID) return false;
+           !glContext.boundsProgramID  ||
+           !glContext.fullscreenProgramID) return false;
 
         glContext.pointShaderTimestamp = max
                                         (
@@ -253,6 +265,29 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, glContext.boundsBufferID);
         }
 
+        // SUPPLY FRAMEBUFFER OBJECT
+        {
+                glGenFramebuffers(1, &glContext.FBOID);
+                glBindFramebuffer(GL_FRAMEBUFFER, glContext.FBOID);
+
+                glGenTextures(1, & glContext.framebufferTextureID);
+                glBindTexture(GL_TEXTURE_2D, glContext.framebufferTextureID);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, RENDER_WIDTH, RENDER_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, glContext.framebufferTextureID, 0);
+
+                glGenRenderbuffers(1, &glContext.RBOID);
+                glBindRenderbuffer(GL_RENDERBUFFER, glContext.RBOID);
+                glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, RENDER_WIDTH, RENDER_HEIGHT);
+                glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, glContext.RBOID);
+
+                GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+                SM_ASSERT(framebufferStatus == GL_FRAMEBUFFER_COMPLETE,
+                          "Framebuffer ERROR: status 0x%X", framebufferStatus);
+        }
 
 
         // Compute uniforms
@@ -271,10 +306,12 @@ bool glInit(BumpAllocator* transientStorage)
         // Voxel debug uniforms
         glContext.vd_projectMatID = glGetUniformLocation(glContext.voxelProgramID, "projectionMatrix");
 
+        // Post processing uniforms
+        glContext.pp_framebufferTextureID = glGetUniformLocation(glContext.fullscreenProgramID, "screenTex");
+
 
         glEnable(GL_FRAMEBUFFER_SRGB);
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_PROGRAM_POINT_SIZE);
+        // glEnable(GL_PROGRAM_POINT_SIZE);
 
         return true;
 }
@@ -358,13 +395,16 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
         mat4 cameraSpaceTransform = projection * view;
 
+        glViewport(0, 0, input->screenSize.x, input->screenSize.y);
+        glBindFramebuffer(GL_FRAMEBUFFER, glContext.FBOID);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glViewport(0, 0, input->screenSize.x, input->screenSize.y);
 
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, glContext.AOgridBufferID);
+
+        glEnable(GL_DEPTH_TEST);
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.matrixBufferID);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
@@ -405,7 +445,7 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
         // Draw Debug voxel grid
         {
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 glUseProgram(glContext.voxelProgramID);
 
                 glUniformMatrix4fv(glContext.vd_projectMatID, 1, GL_FALSE, &cameraSpaceTransform.ax);
@@ -422,5 +462,16 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 glBindVertexArray(glContext.pointVertexArrayID);
                 glDrawArrays(GL_POINTS, 0, renderData->pointCount);
                 glDrawArrays(GL_LINES, renderData->pointCount, BOUNDS_DEBUG_VERTEX_COUNT);
+        }
+
+        // Use fullscreen program to draw framebuffer texture to screen
+        {
+                glUseProgram(glContext.fullscreenProgramID);
+                glUniform1i(glContext.pp_framebufferTextureID, 0);
+
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                glDisable(GL_DEPTH_TEST);
+                glBindTexture(GL_TEXTURE_2D, glContext.framebufferTextureID);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
 }

@@ -62,67 +62,76 @@ static PFNGLGENERATEMIPMAPPROC glGenerateMipmap_ptr;
 static PFNGLDEBUGMESSAGECALLBACKPROC glDebugMessageCallback_ptr;
 static PFNGLDISPATCHCOMPUTEPROC glDispatchCompute_ptr;
 static PFNGLMEMORYBARRIERPROC glMemoryBarrier_ptr;
+static PFNGLGENRENDERBUFFERSPROC glGenRenderbuffers_ptr;
+static PFNGLBINDRENDERBUFFERPROC glBindRenderbuffer_ptr;
+static PFNGLRENDERBUFFERSTORAGEPROC glRenderbufferStorage_ptr;
+static PFNGLFRAMEBUFFERRENDERBUFFERPROC glFramebufferRenderbuffer_ptr;
 
 
 void loadGlFunctions()
 {
-  // Load OpenGL Functions from the Operating System / Graphics Card
-  glCreateProgram_ptr = (PFNGLCREATEPROGRAMPROC)platformLoadGlFunction("glCreateProgram");
-  glDeleteTextures_ptr = (PFNGLDELETETEXTURESPROC)platformLoadGlFunction("glDeleteTextures");
-  glGenTextures_ptr = (PFNGLGENTEXTURESPROC)platformLoadGlFunction("glGenTextures");
-  glBindTexture_ptr = (PFNGLBINDTEXTUREPROC)platformLoadGlFunction("glBindTexture");
-  glDrawArrays_ptr = (PFNGLDRAWARRAYSPROC)platformLoadGlFunction("glDrawArrays");
-  glCreateShader_ptr = (PFNGLCREATESHADERPROC) platformLoadGlFunction("glCreateShader");
-  glGetUniformLocation_ptr = (PFNGLGETUNIFORMLOCATIONPROC) platformLoadGlFunction("glGetUniformLocation");
-  glUniform1f_ptr = (PFNGLUNIFORM1FPROC) platformLoadGlFunction("glUniform1f");
-  glUniform2fv_ptr = (PFNGLUNIFORM2FVPROC) platformLoadGlFunction("glUniform2fv");
-  glUniform3fv_ptr = (PFNGLUNIFORM3FVPROC) platformLoadGlFunction("glUniform3fv");
-  glUniform1i_ptr = (PFNGLUNIFORM1IPROC) platformLoadGlFunction("glUniform1i");
-  glUniformMatrix4fv_ptr = (PFNGLUNIFORMMATRIX4FVPROC) platformLoadGlFunction("glUniformMatrix4fv");
-  glVertexAttribDivisor_ptr = (PFNGLVERTEXATTRIBDIVISORPROC) platformLoadGlFunction("glVertexAttribDivisor");
-  glActiveTexture_ptr = (PFNGLACTIVETEXTUREPROC) platformLoadGlFunction("glActiveTexture");
-  glBufferSubData_ptr = (PFNGLBUFFERSUBDATAPROC) platformLoadGlFunction("glBufferSubData");
-  glDrawArraysInstanced_ptr = (PFNGLDRAWARRAYSINSTANCEDPROC) platformLoadGlFunction("glDrawArraysInstanced");
-  glBindFramebuffer_ptr = (PFNGLBINDFRAMEBUFFERPROC) platformLoadGlFunction("glBindFramebuffer");
-    glBlitFramebuffer_ptr = (PFNGLBLITFRAMEBUFFERPROC) platformLoadGlFunction("glBlitFramebuffer");
-  glCheckFramebufferStatus_ptr = (PFNGLCHECKFRAMEBUFFERSTATUSPROC) platformLoadGlFunction("glCheckFramebufferStatus");
-  glGenFramebuffers_ptr = (PFNGLGENFRAMEBUFFERSPROC) platformLoadGlFunction("glGenFramebuffers");
-  glFramebufferTexture2D_ptr = (PFNGLFRAMEBUFFERTEXTURE2DPROC) platformLoadGlFunction("glFramebufferTexture2D");
-  glDrawBuffers_ptr = (PFNGLDRAWBUFFERSPROC) platformLoadGlFunction("glDrawBuffers");
-  glDeleteFramebuffers_ptr = (PFNGLDELETEFRAMEBUFFERSPROC) platformLoadGlFunction("glDeleteFramebuffers");
-  glBlendFunci_ptr = (PFNGLBLENDFUNCIPROC) platformLoadGlFunction("glBlendFunci");
-  glBlendEquation_ptr = (PFNGLBLENDEQUATIONPROC) platformLoadGlFunction("glBlendEquation");
-  glClearBufferfv_ptr = (PFNGLCLEARBUFFERFVPROC) platformLoadGlFunction("glClearBufferfv");
-  glShaderSource_ptr = (PFNGLSHADERSOURCEPROC) platformLoadGlFunction("glShaderSource");
-  glCompileShader_ptr = (PFNGLCOMPILESHADERPROC) platformLoadGlFunction("glCompileShader");
-  glGetShaderiv_ptr = (PFNGLGETSHADERIVPROC) platformLoadGlFunction("glGetShaderiv");
-  glGetShaderInfoLog_ptr = (PFNGLGETSHADERINFOLOGPROC) platformLoadGlFunction("glGetShaderInfoLog");
-  glAttachShader_ptr = (PFNGLATTACHSHADERPROC) platformLoadGlFunction("glAttachShader");
-  glLinkProgram_ptr = (PFNGLLINKPROGRAMPROC) platformLoadGlFunction("glLinkProgram");
-  glValidateProgram_ptr = (PFNGLVALIDATEPROGRAMPROC) platformLoadGlFunction("glValidateProgram");
-  glGetProgramiv_ptr = (PFNGLGETPROGRAMIVPROC) platformLoadGlFunction("glGetProgramiv");
-  glGetProgramInfoLog_ptr = (PFNGLGETPROGRAMINFOLOGPROC) platformLoadGlFunction("glGetProgramInfoLog");
-  glGenBuffers_ptr = (PFNGLGENBUFFERSPROC) platformLoadGlFunction("glGenBuffers");
-  glGenVertexArrays_ptr = (PFNGLGENVERTEXARRAYSPROC) platformLoadGlFunction("glGenVertexArrays");
-  glGetAttribLocation_ptr = (PFNGLGETATTRIBLOCATIONPROC) platformLoadGlFunction("glGetAttribLocation");
-  glBindVertexArray_ptr = (PFNGLBINDVERTEXARRAYPROC) platformLoadGlFunction("glBindVertexArray");
-  glEnableVertexAttribArray_ptr = (PFNGLENABLEVERTEXATTRIBARRAYPROC) platformLoadGlFunction("glEnableVertexAttribArray");
-  glVertexAttribPointer_ptr = (PFNGLVERTEXATTRIBPOINTERPROC) platformLoadGlFunction("glVertexAttribPointer");
-  glBindBuffer_ptr = (PFNGLBINDBUFFERPROC) platformLoadGlFunction("glBindBuffer");
-  glBindBufferBase_ptr = (PFNGLBINDBUFFERBASEPROC) platformLoadGlFunction("glBindBufferBase");
-  glBufferData_ptr = (PFNGLBUFFERDATAPROC) platformLoadGlFunction("glBufferData");
-  glGetVertexAttribPointerv_ptr = (PFNGLGETVERTEXATTRIBPOINTERVPROC) platformLoadGlFunction("glGetVertexAttribPointerv");
-  glUseProgram_ptr = (PFNGLUSEPROGRAMPROC) platformLoadGlFunction("glUseProgram");
-  glDeleteVertexArrays_ptr = (PFNGLDELETEVERTEXARRAYSPROC) platformLoadGlFunction("glDeleteVertexArrays");
-  glDeleteBuffers_ptr = (PFNGLDELETEBUFFERSPROC) platformLoadGlFunction("glDeleteBuffers");
-  glDeleteProgram_ptr = (PFNGLDELETEPROGRAMPROC) platformLoadGlFunction("glDeleteProgram");
-  glDetachShader_ptr = (PFNGLDETACHSHADERPROC) platformLoadGlFunction("glDetachShader");
-  glDeleteShader_ptr = (PFNGLDELETESHADERPROC) platformLoadGlFunction("glDeleteShader");
-  glDrawElementsInstanced_ptr = (PFNGLDRAWELEMENTSINSTANCEDPROC) platformLoadGlFunction("glDrawElementsInstanced");
-  glGenerateMipmap_ptr = (PFNGLGENERATEMIPMAPPROC) platformLoadGlFunction("glGenerateMipmap");
-  glDebugMessageCallback_ptr = (PFNGLDEBUGMESSAGECALLBACKPROC)platformLoadGlFunction("glDebugMessageCallback");
-  glDispatchCompute_ptr = (PFNGLDISPATCHCOMPUTEPROC) platformLoadGlFunction("glDispatchCompute");
-  glMemoryBarrier_ptr = (PFNGLMEMORYBARRIERPROC) platformLoadGlFunction("glMemoryBarrier");
+        // Load OpenGL Functions from the Operating System / Graphics Card
+        glCreateProgram_ptr = (PFNGLCREATEPROGRAMPROC)platformLoadGlFunction("glCreateProgram");
+        glDeleteTextures_ptr = (PFNGLDELETETEXTURESPROC)platformLoadGlFunction("glDeleteTextures");
+        glGenTextures_ptr = (PFNGLGENTEXTURESPROC)platformLoadGlFunction("glGenTextures");
+        glBindTexture_ptr = (PFNGLBINDTEXTUREPROC)platformLoadGlFunction("glBindTexture");
+        glDrawArrays_ptr = (PFNGLDRAWARRAYSPROC)platformLoadGlFunction("glDrawArrays");
+        glCreateShader_ptr = (PFNGLCREATESHADERPROC) platformLoadGlFunction("glCreateShader");
+        glGetUniformLocation_ptr = (PFNGLGETUNIFORMLOCATIONPROC) platformLoadGlFunction("glGetUniformLocation");
+        glUniform1f_ptr = (PFNGLUNIFORM1FPROC) platformLoadGlFunction("glUniform1f");
+        glUniform2fv_ptr = (PFNGLUNIFORM2FVPROC) platformLoadGlFunction("glUniform2fv");
+        glUniform3fv_ptr = (PFNGLUNIFORM3FVPROC) platformLoadGlFunction("glUniform3fv");
+        glUniform1i_ptr = (PFNGLUNIFORM1IPROC) platformLoadGlFunction("glUniform1i");
+        glUniformMatrix4fv_ptr = (PFNGLUNIFORMMATRIX4FVPROC) platformLoadGlFunction("glUniformMatrix4fv");
+        glVertexAttribDivisor_ptr = (PFNGLVERTEXATTRIBDIVISORPROC) platformLoadGlFunction("glVertexAttribDivisor");
+        glActiveTexture_ptr = (PFNGLACTIVETEXTUREPROC) platformLoadGlFunction("glActiveTexture");
+        glBufferSubData_ptr = (PFNGLBUFFERSUBDATAPROC) platformLoadGlFunction("glBufferSubData");
+        glDrawArraysInstanced_ptr = (PFNGLDRAWARRAYSINSTANCEDPROC) platformLoadGlFunction("glDrawArraysInstanced");
+        glBindFramebuffer_ptr = (PFNGLBINDFRAMEBUFFERPROC) platformLoadGlFunction("glBindFramebuffer");
+        glBlitFramebuffer_ptr = (PFNGLBLITFRAMEBUFFERPROC) platformLoadGlFunction("glBlitFramebuffer");
+        glCheckFramebufferStatus_ptr = (PFNGLCHECKFRAMEBUFFERSTATUSPROC) platformLoadGlFunction("glCheckFramebufferStatus");
+        glGenFramebuffers_ptr = (PFNGLGENFRAMEBUFFERSPROC) platformLoadGlFunction("glGenFramebuffers");
+        glFramebufferTexture2D_ptr = (PFNGLFRAMEBUFFERTEXTURE2DPROC) platformLoadGlFunction("glFramebufferTexture2D");
+        glDrawBuffers_ptr = (PFNGLDRAWBUFFERSPROC) platformLoadGlFunction("glDrawBuffers");
+        glDeleteFramebuffers_ptr = (PFNGLDELETEFRAMEBUFFERSPROC) platformLoadGlFunction("glDeleteFramebuffers");
+        glBlendFunci_ptr = (PFNGLBLENDFUNCIPROC) platformLoadGlFunction("glBlendFunci");
+        glBlendEquation_ptr = (PFNGLBLENDEQUATIONPROC) platformLoadGlFunction("glBlendEquation");
+        glClearBufferfv_ptr = (PFNGLCLEARBUFFERFVPROC) platformLoadGlFunction("glClearBufferfv");
+        glShaderSource_ptr = (PFNGLSHADERSOURCEPROC) platformLoadGlFunction("glShaderSource");
+        glCompileShader_ptr = (PFNGLCOMPILESHADERPROC) platformLoadGlFunction("glCompileShader");
+        glGetShaderiv_ptr = (PFNGLGETSHADERIVPROC) platformLoadGlFunction("glGetShaderiv");
+        glGetShaderInfoLog_ptr = (PFNGLGETSHADERINFOLOGPROC) platformLoadGlFunction("glGetShaderInfoLog");
+        glAttachShader_ptr = (PFNGLATTACHSHADERPROC) platformLoadGlFunction("glAttachShader");
+        glLinkProgram_ptr = (PFNGLLINKPROGRAMPROC) platformLoadGlFunction("glLinkProgram");
+        glValidateProgram_ptr = (PFNGLVALIDATEPROGRAMPROC) platformLoadGlFunction("glValidateProgram");
+        glGetProgramiv_ptr = (PFNGLGETPROGRAMIVPROC) platformLoadGlFunction("glGetProgramiv");
+        glGetProgramInfoLog_ptr = (PFNGLGETPROGRAMINFOLOGPROC) platformLoadGlFunction("glGetProgramInfoLog");
+        glGenBuffers_ptr = (PFNGLGENBUFFERSPROC) platformLoadGlFunction("glGenBuffers");
+        glGenVertexArrays_ptr = (PFNGLGENVERTEXARRAYSPROC) platformLoadGlFunction("glGenVertexArrays");
+        glGetAttribLocation_ptr = (PFNGLGETATTRIBLOCATIONPROC) platformLoadGlFunction("glGetAttribLocation");
+        glBindVertexArray_ptr = (PFNGLBINDVERTEXARRAYPROC) platformLoadGlFunction("glBindVertexArray");
+        glEnableVertexAttribArray_ptr = (PFNGLENABLEVERTEXATTRIBARRAYPROC) platformLoadGlFunction("glEnableVertexAttribArray");
+        glVertexAttribPointer_ptr = (PFNGLVERTEXATTRIBPOINTERPROC) platformLoadGlFunction("glVertexAttribPointer");
+        glBindBuffer_ptr = (PFNGLBINDBUFFERPROC) platformLoadGlFunction("glBindBuffer");
+        glBindBufferBase_ptr = (PFNGLBINDBUFFERBASEPROC) platformLoadGlFunction("glBindBufferBase");
+        glBufferData_ptr = (PFNGLBUFFERDATAPROC) platformLoadGlFunction("glBufferData");
+        glGetVertexAttribPointerv_ptr = (PFNGLGETVERTEXATTRIBPOINTERVPROC) platformLoadGlFunction("glGetVertexAttribPointerv");
+        glUseProgram_ptr = (PFNGLUSEPROGRAMPROC) platformLoadGlFunction("glUseProgram");
+        glDeleteVertexArrays_ptr = (PFNGLDELETEVERTEXARRAYSPROC) platformLoadGlFunction("glDeleteVertexArrays");
+        glDeleteBuffers_ptr = (PFNGLDELETEBUFFERSPROC) platformLoadGlFunction("glDeleteBuffers");
+        glDeleteProgram_ptr = (PFNGLDELETEPROGRAMPROC) platformLoadGlFunction("glDeleteProgram");
+        glDetachShader_ptr = (PFNGLDETACHSHADERPROC) platformLoadGlFunction("glDetachShader");
+        glDeleteShader_ptr = (PFNGLDELETESHADERPROC) platformLoadGlFunction("glDeleteShader");
+        glDrawElementsInstanced_ptr = (PFNGLDRAWELEMENTSINSTANCEDPROC) platformLoadGlFunction("glDrawElementsInstanced");
+        glGenerateMipmap_ptr = (PFNGLGENERATEMIPMAPPROC) platformLoadGlFunction("glGenerateMipmap");
+        glDebugMessageCallback_ptr = (PFNGLDEBUGMESSAGECALLBACKPROC)platformLoadGlFunction("glDebugMessageCallback");
+        glDispatchCompute_ptr = (PFNGLDISPATCHCOMPUTEPROC) platformLoadGlFunction("glDispatchCompute");
+        glMemoryBarrier_ptr = (PFNGLMEMORYBARRIERPROC) platformLoadGlFunction("glMemoryBarrier");
+        glGenRenderbuffers_ptr = (PFNGLGENRENDERBUFFERSPROC) platformLoadGlFunction("glGenRenderbuffers");
+        glBindRenderbuffer_ptr = (PFNGLBINDRENDERBUFFERPROC) platformLoadGlFunction("glBindRenderbuffer");
+        glRenderbufferStorage_ptr = (PFNGLRENDERBUFFERSTORAGEPROC) platformLoadGlFunction("glRenderbufferStorage");
+        glFramebufferRenderbuffer_ptr = (PFNGLFRAMEBUFFERRENDERBUFFERPROC) platformLoadGlFunction("glFramebufferRenderbuffer");
+
 }
 
 // #############################################################################
@@ -409,4 +418,24 @@ void glDispatchCompute(GLuint numGroupsX, GLuint numGroupsY, GLuint numGroupsZ)
 void glMemoryBarrier(GLbitfield barriers)
 {
   glMemoryBarrier_ptr(barriers);
+}
+
+void glGenRenderbuffers(GLsizei n, GLuint *renderbuffers)
+{
+        glGenRenderbuffers_ptr(n, renderbuffers);
+}
+
+void glBindRenderbuffer(GLenum target, GLuint renderbuffer)
+{
+        glBindRenderbuffer_ptr(target, renderbuffer);
+}
+
+void glRenderbufferStorage(GLenum target, GLenum internalformat, GLsizei width, GLsizei height)
+{
+        glRenderbufferStorage_ptr(target, internalformat, width, height);
+}
+
+void glFramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer)
+{
+        glFramebufferRenderbuffer_ptr(target, attachment, renderbuffertarget, renderbuffer);
 }

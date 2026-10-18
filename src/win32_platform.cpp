@@ -365,7 +365,7 @@ void* platformLoadGlFunction(const char* name)
                 proc = GetProcAddress(openglDLL, name);
                 if(!proc)
                 {
-                        SM_ASSERT(false, "Failed to load gl function %s", "glCreateProgram");
+                        SM_ASSERT(false, "Failed to load gl function %s", name);
                         return nullptr;
                 }
         }
