@@ -14,6 +14,8 @@ struct GLContext
         GLuint voxelProgramID;
         GLuint boundsProgramID;
         GLuint fullscreenProgramID;
+        GLuint downscaleProgramID;
+        GLuint upscaleProgramID;
 
         // SSBO Buffers
         GLuint pointVertexArrayID;
@@ -24,6 +26,7 @@ struct GLContext
         
         GLuint FBOID;
         GLuint RBOID;
+        GLuint bloomFBOID;
 
         // Point cloud uniforms
         GLuint projectionID;
@@ -43,13 +46,15 @@ struct GLContext
 
         // Post processing uniforms
         GLuint pp_framebufferTextureID;
+        GLuint pp_bloomTextureID;
+        GLuint downscaleSrcTextureID;
+        GLuint downscaleSrcResolutionID;
+        GLuint upscaleSrcTextureID;
+        GLuint upscaleFilterRadiusID;
 
         // Texture IDs
         GLuint framebufferTextureID;
-
-        // Timestamps
-        long long pointShaderTimestamp;
-        long long boundsShaderTimestamp;
+        std::vector<bloomMip> bloomMipChain;
 };
 
 
@@ -112,13 +117,16 @@ GLuint glShaderInit(int shaderType, const char* shaderPath, BumpAllocator* trans
         return shaderID;
 }
 
-GLuint glCreateShaderProgram(BumpAllocator* transientStorage, const char* shaderName)
+GLuint glCreateShaderProgram(BumpAllocator* transientStorage, const char* vertexShaderName,
+                             const char* fragmentShaderName = nullptr)
 {
+        if(!fragmentShaderName) fragmentShaderName = vertexShaderName;
+
         GLuint vertShaderID = glShaderInit(GL_VERTEX_SHADER,   
-                (std::string("assets/shaders/") + shaderName + std::string(".vert")).c_str(), 
+                (std::string("assets/shaders/") + vertexShaderName + std::string(".vert")).c_str(),
                 transientStorage);
         GLuint fragShaderID = glShaderInit(GL_FRAGMENT_SHADER, 
-                (std::string("assets/shaders/") + shaderName + std::string(".frag")).c_str(), 
+                (std::string("assets/shaders/") + fragmentShaderName + std::string(".frag")).c_str(),
                 transientStorage);
 
         if(!vertShaderID || !fragShaderID)
@@ -143,7 +151,7 @@ GLuint glCreateShaderProgram(BumpAllocator* transientStorage, const char* shader
         {
                 char programInfoLog[512] = {};
                 glGetProgramInfoLog(programID, sizeof(programInfoLog), 0, programInfoLog);
-                SM_ASSERT(false, "Failed to link point cloud shader: %s", programInfoLog);
+                SM_ASSERT(false, "Failed to link shader program: %s", programInfoLog);
                 glDeleteProgram(programID);
                 return 0;
         }
@@ -192,29 +200,25 @@ bool glInit(BumpAllocator* transientStorage)
         glContext.voxelProgramID      = glCreateShaderProgram (transientStorage, VOXEL_PROGRAM_NAME);
         glContext.boundsProgramID     = glCreateComputeProgram(transientStorage, BOUND_PROGRAM_NAME);
         glContext.fullscreenProgramID = glCreateShaderProgram (transientStorage, FULLSCREEN_PROGRAM_NAME);
+        glContext.downscaleProgramID  = glCreateShaderProgram(
+                transientStorage, FULLSCREEN_PROGRAM_NAME, DOWNSCALE_PROGRAM_NAME);
+        glContext.upscaleProgramID    = glCreateShaderProgram(
+                transientStorage, FULLSCREEN_PROGRAM_NAME, UPSCALE_PROGRAM_NAME);
 
         if(!glContext.pointProgramID   || 
            !glContext.computeProgramID ||
            !glContext.voxelProgramID   ||
            !glContext.boundsProgramID  ||
-           !glContext.fullscreenProgramID) return false;
-
-        glContext.pointShaderTimestamp = max
-                                        (
-                                                max(getTimestamp("assets/shaders/IFS.comp"),
-                                                    getTimestamp("assets/shaders/voxel_cube.frag")),
-                                                max(getTimestamp("assets/shaders/point_cloud.vert"),
-                                                    getTimestamp("assets/shaders/point_cloud.frag"))
-                                        );
-        glContext.boundsShaderTimestamp = getTimestamp("assets/shaders/bounds_compute.comp");
-
+           !glContext.fullscreenProgramID ||
+           !glContext.downscaleProgramID ||
+           !glContext.upscaleProgramID) return false;
 
         glGenVertexArrays(1, &glContext.pointVertexArrayID);
         glBindVertexArray(glContext.pointVertexArrayID);
 
 
         
-        // SUPPLY POINT BUFFER TO COMPUTE SHADER TO WORK ON
+        // INIT POINT BUFFER TO COMPUTE SHADER TO WORK ON
         {
                 glGenBuffers(1, &glContext.pointBufferID);
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.pointBufferID);
@@ -231,7 +235,7 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
         }
 
-        // SUPPLY TRANSFORM MATRICES TO COMPUTE SHADER
+        // INIT TRANSFORM MATRICES TO COMPUTE SHADER
         {
                 glGenBuffers(1, &glContext.matrixBufferID);
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.matrixBufferID);
@@ -240,7 +244,7 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
         }
 
-        // SUPPLY AMBIENT OCCLUSION GRID FOR LIGHTING
+        // INIT AMBIENT OCCLUSION GRID FOR LIGHTING
         {
                 glGenBuffers(1, &glContext.AOgridBufferID);
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.AOgridBufferID);
@@ -249,7 +253,7 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, glContext.AOgridBufferID);
         }
 
-        // SUPPLY AABB BOUNDS BUFFER 
+        // INIT AABB BOUNDS BUFFER
         {
                 struct BoundsGPU
                 {
@@ -265,30 +269,75 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, glContext.boundsBufferID);
         }
 
-        // SUPPLY FRAMEBUFFER OBJECT
+        // INIT FRAMEBUFFER OBJECT
         {
                 glGenFramebuffers(1, &glContext.FBOID);
                 glBindFramebuffer(GL_FRAMEBUFFER, glContext.FBOID);
 
-                glGenTextures(1, & glContext.framebufferTextureID);
+                glGenTextures(1, &glContext.framebufferTextureID);
                 glBindTexture(GL_TEXTURE_2D, glContext.framebufferTextureID);
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, RENDER_WIDTH, RENDER_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, RENDER_WIDTH, RENDER_HEIGHT, 0,
+                             GL_RGBA, GL_FLOAT, nullptr);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, glContext.framebufferTextureID, 0);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                       glContext.framebufferTextureID, 0);
 
                 glGenRenderbuffers(1, &glContext.RBOID);
                 glBindRenderbuffer(GL_RENDERBUFFER, glContext.RBOID);
                 glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, RENDER_WIDTH, RENDER_HEIGHT);
                 glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, glContext.RBOID);
 
+                GLenum attachment = GL_COLOR_ATTACHMENT0;
+                glDrawBuffers(1, &attachment);
+
                 GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
                 SM_ASSERT(framebufferStatus == GL_FRAMEBUFFER_COMPLETE,
                           "Framebuffer ERROR: status 0x%X", framebufferStatus);
         }
 
+        // INIT BLOOM FRAMEBUFFER OBJECT
+        {
+                glGenFramebuffers(1, &glContext.bloomFBOID);
+                glBindFramebuffer(GL_FRAMEBUFFER, glContext.bloomFBOID);
+
+                ivec2 mipIntSize = {(int)RENDER_WIDTH, (int)RENDER_HEIGHT};
+
+                for(int i = 0; i < MIP_CHAIN_LENGTH; i++)
+                {
+                        bloomMip mip;
+
+                        mipIntSize.x = max(1, mipIntSize.x / MIP_RATIO);
+                        mipIntSize.y = max(1, mipIntSize.y / MIP_RATIO);
+                        mip.iSize = mipIntSize;
+
+                        glGenTextures(1, &mip.texture);
+                        glBindTexture(GL_TEXTURE_2D, mip.texture);
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F,
+                                     mipIntSize.x, mipIntSize.y,
+                                     0, GL_RGB, GL_FLOAT, nullptr);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+                        glContext.bloomMipChain.emplace_back(mip);
+                }
+
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                       glContext.bloomMipChain[0].texture, 0);
+
+                GLenum attachment = GL_COLOR_ATTACHMENT0;
+                glDrawBuffers(1, &attachment);
+
+                GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+                SM_ASSERT(framebufferStatus == GL_FRAMEBUFFER_COMPLETE,
+                          "Bloom framebuffer ERROR: status 0x%X", framebufferStatus);
+
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
 
         // Compute uniforms
         glContext.computeTimeID = glGetUniformLocation(glContext.computeProgramID, "TIME");
@@ -308,6 +357,11 @@ bool glInit(BumpAllocator* transientStorage)
 
         // Post processing uniforms
         glContext.pp_framebufferTextureID = glGetUniformLocation(glContext.fullscreenProgramID, "screenTex");
+        glContext.pp_bloomTextureID = glGetUniformLocation(glContext.fullscreenProgramID, "bloomTex");
+        glContext.downscaleSrcTextureID = glGetUniformLocation(glContext.downscaleProgramID, "srcTexture");
+        glContext.downscaleSrcResolutionID = glGetUniformLocation(glContext.downscaleProgramID, "srcResolution");
+        glContext.upscaleSrcTextureID = glGetUniformLocation(glContext.upscaleProgramID, "srcTexture");
+        glContext.upscaleFilterRadiusID = glGetUniformLocation(glContext.upscaleProgramID, "filterRadius");
 
 
         glEnable(GL_FRAMEBUFFER_SRGB);
@@ -318,61 +372,6 @@ bool glInit(BumpAllocator* transientStorage)
 
 void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float timeSeconds)
 {
-        // HOT SHADER RELOADING
-        {
-                long long timestampVert = getTimestamp("assets/shaders/point_cloud.vert");
-                long long timestampFrag = getTimestamp("assets/shaders/point_cloud.frag");
-                long long timestampCompute = getTimestamp("assets/shaders/IFS.comp");
-                long long timestampBounds = getTimestamp("assets/shaders/bounds_compute.comp");
-
-                if(timestampVert > glContext.pointShaderTimestamp ||
-                timestampFrag > glContext.pointShaderTimestamp ||
-                timestampCompute > glContext.pointShaderTimestamp)
-                {
-                        GLuint programID = glCreateShaderProgram(transientStorage, POINT_PROGRAM_NAME);
-                        GLuint computeProgramID = glCreateComputeProgram(transientStorage, IFS_PROGRAM_NAME);
-
-                        if(programID && computeProgramID)
-                        {
-                                glDeleteProgram(glContext.pointProgramID);
-                                glDeleteProgram(glContext.computeProgramID);
-
-                                glContext.pointProgramID = programID;
-                                glContext.computeProgramID = computeProgramID;
-                                glContext.projectionID = glGetUniformLocation(
-                                        glContext.pointProgramID, "cameraSpaceTransform");
-                                glContext.vertexAOgridSizeID = glGetUniformLocation(
-                                        glContext.pointProgramID, "AOgridSize");
-                                glContext.computeTimeID = glGetUniformLocation(
-                                        glContext.computeProgramID, "TIME");
-                                glContext.computePointCountID = glGetUniformLocation(
-                                        glContext.computeProgramID, "pointCount");
-                                glContext.computeMatrixCountID = glGetUniformLocation(
-                                        glContext.computeProgramID, "matrixCount");
-                                glContext.computeAOgridSizeID = glGetUniformLocation(
-                                        glContext.computeProgramID, "AOgridSize");
-                                glContext.pointShaderTimestamp = max(
-                                        max(timestampVert, timestampFrag),
-                                        timestampCompute);
-                        }
-                }
-
-                if(timestampBounds > glContext.boundsShaderTimestamp)
-                {
-                        GLuint boundsProgramID = glCreateComputeProgram(
-                                transientStorage, BOUND_PROGRAM_NAME);
-                        if(boundsProgramID)
-                        {
-                                glDeleteProgram(glContext.boundsProgramID);
-                                glContext.boundsProgramID = boundsProgramID;
-                                glContext.boundsMatrixCountID = glGetUniformLocation(
-                                        glContext.boundsProgramID, "matrixCount");
-                                glContext.boundsShaderTimestamp = timestampBounds;
-                        }
-                }
-                
-        }
-
         
         if(renderData->pointCount < 0 || renderData->pointCount > MAX_POINTS)
         {
@@ -464,14 +463,74 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 glDrawArrays(GL_LINES, renderData->pointCount, BOUNDS_DEBUG_VERTEX_COUNT);
         }
 
-        // Use fullscreen program to draw framebuffer texture to screen
+        // Downsample the complete HDR scene into the bloom mip chain.
+        {
+                glDisable(GL_DEPTH_TEST);
+                glBindFramebuffer(GL_FRAMEBUFFER, glContext.bloomFBOID);
+                glUseProgram(glContext.downscaleProgramID);
+                glUniform1i(glContext.downscaleSrcTextureID, 0);
+                glActiveTexture(GL_TEXTURE0);
+
+                GLuint sourceTexture = glContext.framebufferTextureID;
+                int sourceWidth = RENDER_WIDTH;
+                int sourceHeight = RENDER_HEIGHT;
+
+                for(size_t i = 0; i < glContext.bloomMipChain.size(); i++)
+                {
+                        bloomMip& mip = glContext.bloomMipChain[i];
+                        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                               mip.texture, 0);
+                        glViewport(0, 0, mip.iSize.x, mip.iSize.y);
+                        glBindTexture(GL_TEXTURE_2D, sourceTexture);
+                        vec2 sourceResolution = {(float)sourceWidth, (float)sourceHeight};
+                        glUniform2fv(glContext.downscaleSrcResolutionID, 1, &sourceResolution.x);
+                        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                        sourceTexture = mip.texture;
+                        sourceWidth = mip.iSize.x;
+                        sourceHeight = mip.iSize.y;
+                }
+        }
+
+        // Progressively blur and add each smaller mip into the next larger mip.
+        {
+                glUseProgram(glContext.upscaleProgramID);
+                glUniform1i(glContext.upscaleSrcTextureID, 0);
+                glActiveTexture(GL_TEXTURE0);
+                glEnable(GL_BLEND);
+                glBlendEquation(GL_FUNC_ADD);
+                glBlendFunci(0, GL_ONE, GL_ONE);
+
+                for(int i = (int)glContext.bloomMipChain.size() - 1; i > 0; i--)
+                {
+                        bloomMip& sourceMip = glContext.bloomMipChain[i];
+                        bloomMip& targetMip = glContext.bloomMipChain[i - 1];
+                        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                               targetMip.texture, 0);
+                        glViewport(0, 0, targetMip.iSize.x, targetMip.iSize.y);
+                        glBindTexture(GL_TEXTURE_2D, sourceMip.texture);
+                        vec2 filterRadius = {1.0f / sourceMip.iSize.x,
+                                             1.0f / sourceMip.iSize.y};
+                        glUniform2fv(glContext.upscaleFilterRadiusID, 1, &filterRadius.x);
+                        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                }
+
+                glDisable(GL_BLEND);
+        }
+
+        // Mix the HDR scene with the completed bloom texture for display.
         {
                 glUseProgram(glContext.fullscreenProgramID);
                 glUniform1i(glContext.pp_framebufferTextureID, 0);
+                glUniform1i(glContext.pp_bloomTextureID, 1);
 
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                glViewport(0, 0, input->screenSize.x, input->screenSize.y);
                 glDisable(GL_DEPTH_TEST);
+                glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, glContext.framebufferTextureID);
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, glContext.bloomMipChain[0].texture);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
 }

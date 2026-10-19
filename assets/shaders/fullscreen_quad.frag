@@ -4,6 +4,7 @@ out vec4 fragColor;
 in vec2 texCoords;
 
 uniform sampler2D screenTex;
+uniform sampler2D bloomTex;
 
 void main()
 {
@@ -81,5 +82,8 @@ void main()
                 }
         }
 
-        fragColor = bestColor;
+        const float bloomStrength = 0.04;
+        vec3 sceneColor = texture(screenTex, texCoords).rgb;
+        vec3 bloomColor = texture(bloomTex, texCoords).rgb;
+        fragColor = vec4(mix(sceneColor, bloomColor, bloomStrength), 1.0);
 }

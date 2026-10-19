@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "assets.h"
 #include "math_lib.h"
@@ -22,11 +23,16 @@ constexpr int RENDER_HEIGHT = 1080/1.5;
 static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_COUNT_X * MAX_COMPUTE_WORK_GROUP_COUNT_X ,
               "MAX_POINTS must fit in one compute dispatch");
 
+constexpr unsigned int MIP_CHAIN_LENGTH = 4;
+constexpr int MIP_RATIO = 3;
+
 const char* POINT_PROGRAM_NAME = "point_cloud";
 const char* VOXEL_PROGRAM_NAME = "voxel_cube";
 const char* IFS_PROGRAM_NAME = "IFS";
 const char* BOUND_PROGRAM_NAME = "bounds_compute";
 const char* FULLSCREEN_PROGRAM_NAME = "fullscreen_quad";
+const char* DOWNSCALE_PROGRAM_NAME = "downscale";
+const char* UPSCALE_PROGRAM_NAME = "upscale";
 
 
 /// ##############################################################################################
@@ -82,6 +88,11 @@ struct RenderData
         int pointCount;
 };
 
+struct bloomMip
+{
+        ivec2 iSize;
+        GLuint texture;
+};
 
 /// ##############################################################################################
 ///                                     Simulation Structs
