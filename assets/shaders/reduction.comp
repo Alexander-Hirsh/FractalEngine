@@ -1,0 +1,67 @@
+#version 430 core
+
+layout(local_size_x = 4, local_size_y = 8, local_size_z = 8) in;
+
+layout(std430, binding = 2) readonly buffer AOGridBuffer { uint AOgrid[]; };
+layout(std430, binding = 4) writeonly buffer ReductionBuffer { uint reducedGrid[]; };
+
+uniform int gridSize;
+
+uint loadWord(int wx, int y, int z)
+{
+        int wordsPerRow = gridSize / 32;
+        if (wx < 0 || wx >= wordsPerRow ||
+            y < 0 || y >= gridSize || z < 0 || z >= gridSize)
+                return 0u;
+
+        uint index = uint((z * gridSize + y) * wordsPerRow + wx);
+        return AOgrid[index];
+}
+
+void accumulate(inout uint planes[5], uint value)
+{
+        uint carry = value;
+        for (int i = 0; i < 5; ++i)
+        {
+                uint current = planes[i];
+                planes[i] = current ^ carry;
+                carry = current & carry;
+        }
+}
+
+void main()
+{
+        ivec3 id = ivec3(gl_GlobalInvocationID);
+        int wordsPerRow = gridSize / 32;
+        if (id.x >= wordsPerRow || id.y >= gridSize || id.z >= gridSize)
+                return;
+
+        uint planes[5] = uint[5](0u, 0u, 0u, 0u, 0u);
+
+        for (int dz = -1; dz <= 1; ++dz)
+        {
+                for (int dy = -1; dy <= 1; ++dy)
+                {
+                        int y = id.y + dy;
+                        int z = id.z + dz;
+                        uint word = loadWord(id.x, y, z);
+                        uint left = loadWord(id.x - 1, y, z);
+                        uint right = loadWord(id.x + 1, y, z);
+
+                        accumulate(planes, (word << 1) | (left >> 31));
+                        accumulate(planes, (word >> 1) | (right << 31));
+                        accumulate(planes, word);
+                }
+        }
+
+        uint base = uint((id.z * gridSize + id.y) * gridSize + id.x * 32);
+        for (uint bit = 0u; bit < 32u; ++bit)
+        {
+                uint count = ((planes[0] >> bit) & 1u)
+                           | (((planes[1] >> bit) & 1u) << 1)
+                           | (((planes[2] >> bit) & 1u) << 2)
+                           | (((planes[3] >> bit) & 1u) << 3)
+                           | (((planes[4] >> bit) & 1u) << 4);
+                reducedGrid[base + bit] = count;
+        }
+}

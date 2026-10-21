@@ -14,8 +14,9 @@ struct GLContext
         GLuint voxelProgramID;
         GLuint boundsProgramID;
         GLuint fullscreenProgramID;
-        GLuint downscaleProgramID;
-        GLuint upscaleProgramID;
+        GLuint downscaleProgramID;      // Downscaler for blur textures
+        GLuint upscaleProgramID;        // Upscaler for blur textures
+        GLuint reductionProgramID;      // Precomputes AO grid for sampling
 
         // SSBO Buffers
         GLuint pointVertexArrayID;
@@ -23,6 +24,7 @@ struct GLContext
         GLuint matrixBufferID;
         GLuint boundsBufferID;
         GLuint AOgridBufferID;
+        GLuint sortedAOGridBufferID;
         
         GLuint FBOID;
         GLuint RBOID;
@@ -37,6 +39,9 @@ struct GLContext
         GLuint computePointCountID;
         GLuint computeMatrixCountID;
         GLuint computeAOgridSizeID;
+
+        // Reduction uniforms
+        GLuint reductionAOgridSizeID;
 
         //Bounds uniforms
         GLuint boundsMatrixCountID;
@@ -62,7 +67,7 @@ struct GLContext
 ///                                     OpenGl Globals
 /// ##############################################################################################
 static GLContext glContext;
-static const uint32_t emptyAOGrid[AO_GRID_CELL_COUNT] = {};
+static const uint32_t emptyAOGrid[AO_GRID_32BIT_GRID_SIZE] = {};
 
 
 /// ##############################################################################################
@@ -200,18 +205,18 @@ bool glInit(BumpAllocator* transientStorage)
         glContext.voxelProgramID      = glCreateShaderProgram (transientStorage, VOXEL_PROGRAM_NAME);
         glContext.boundsProgramID     = glCreateComputeProgram(transientStorage, BOUND_PROGRAM_NAME);
         glContext.fullscreenProgramID = glCreateShaderProgram (transientStorage, FULLSCREEN_PROGRAM_NAME);
-        glContext.downscaleProgramID  = glCreateShaderProgram(
-                transientStorage, FULLSCREEN_PROGRAM_NAME, DOWNSCALE_PROGRAM_NAME);
-        glContext.upscaleProgramID    = glCreateShaderProgram(
-                transientStorage, FULLSCREEN_PROGRAM_NAME, UPSCALE_PROGRAM_NAME);
+        glContext.downscaleProgramID  = glCreateShaderProgram (transientStorage, FULLSCREEN_PROGRAM_NAME, DOWNSCALE_PROGRAM_NAME);
+        glContext.upscaleProgramID    = glCreateShaderProgram (transientStorage, FULLSCREEN_PROGRAM_NAME, UPSCALE_PROGRAM_NAME);
+        glContext.reductionProgramID  = glCreateComputeProgram(transientStorage, REDUCTION_PROGRAM_NAME);
 
-        if(!glContext.pointProgramID   || 
-           !glContext.computeProgramID ||
-           !glContext.voxelProgramID   ||
-           !glContext.boundsProgramID  ||
-           !glContext.fullscreenProgramID ||
-           !glContext.downscaleProgramID ||
-           !glContext.upscaleProgramID) return false;
+        if(!glContext.pointProgramID       || 
+           !glContext.computeProgramID     ||
+           !glContext.voxelProgramID       ||
+           !glContext.boundsProgramID      ||
+           !glContext.fullscreenProgramID  ||
+           !glContext.downscaleProgramID   ||
+           !glContext.upscaleProgramID     ||
+           !glContext.reductionProgramID)  return false;
 
         glGenVertexArrays(1, &glContext.pointVertexArrayID);
         glBindVertexArray(glContext.pointVertexArrayID);
@@ -244,13 +249,21 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
         }
 
-        // INIT AMBIENT OCCLUSION GRID FOR LIGHTING
+        // INIT AMBIENT OCCLUSION GRIDS FOR LIGHTING
         {
+                // Regular grid
                 glGenBuffers(1, &glContext.AOgridBufferID);
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.AOgridBufferID);
                 glBufferData(GL_SHADER_STORAGE_BUFFER,
-                             sizeof(emptyAOGrid), emptyAOGrid, GL_DYNAMIC_DRAW);
+                             sizeof(uint32_t) * AO_GRID_32BIT_GRID_SIZE, nullptr, GL_DYNAMIC_DRAW);
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, glContext.AOgridBufferID);
+
+                // Sorted grid
+                glGenBuffers(1, &glContext.sortedAOGridBufferID);
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.sortedAOGridBufferID);
+                glBufferData(GL_SHADER_STORAGE_BUFFER,
+                             sizeof(uint32_t) * AO_GRID_CELL_COUNT, nullptr, GL_DYNAMIC_DRAW);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, glContext.sortedAOGridBufferID);
         }
 
         // INIT AABB BOUNDS BUFFER
@@ -363,6 +376,8 @@ bool glInit(BumpAllocator* transientStorage)
         glContext.upscaleSrcTextureID = glGetUniformLocation(glContext.upscaleProgramID, "srcTexture");
         glContext.upscaleFilterRadiusID = glGetUniformLocation(glContext.upscaleProgramID, "filterRadius");
 
+        glContext.reductionAOgridSizeID = glGetUniformLocation(glContext.reductionProgramID, "gridSize");
+
 
         glEnable(GL_FRAMEBUFFER_SRGB);
         // glEnable(GL_PROGRAM_POINT_SIZE);
@@ -439,7 +454,16 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
 
                 glDispatchCompute(workGroupCount, 1, 1);
 
-                glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        }
+
+        // Use reduction program to precompute grid neighbors
+        {
+                glUseProgram(glContext.reductionProgramID);
+                glUniform1i(glContext.reductionAOgridSizeID, AO_GRID_SIDE_SIZE);
+
+                glDispatchCompute(AO_GRID_SIDE_SIZE / 32 / 4, AO_GRID_SIDE_SIZE / 8, AO_GRID_SIDE_SIZE / 8);   // = (1, 16, 16)
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
 
         // Draw Debug voxel grid

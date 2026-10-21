@@ -127,7 +127,7 @@ bool platformCreateWindow(int width, int height, const wchar_t* title)
         }
 
         // WS_CAPTION 
-        int dwStyle = WS_OVERLAPPEDWINDOW; // WS_POPUP
+        int dwStyle = WS_POPUP; // WS_POPUP WS_OVERLAPPEDWINDOW
 
         PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB = nullptr;
         PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = nullptr;

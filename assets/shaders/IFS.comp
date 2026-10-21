@@ -5,21 +5,9 @@
 // Keep local_size_x synchronized with POINT_COMPUTE_LOCAL_SIZE in render_interface.h.
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-layout(std430, binding = 0) buffer PointsBuffer
-{
-        vec4 points[];
-};
-
-layout(std430, binding = 1) readonly buffer TransformBuffer
-{
-        mat4 transforms[];
-};
-
-layout(std430, binding = 2) buffer SpatialGridBuffer
-{
-        uint spatialGrid[];
-};
-
+layout(std430, binding = 0) buffer PointsBuffer { vec4 points[]; };
+layout(std430, binding = 1) readonly buffer TransformBuffer { mat4 transforms[]; };
+layout(std430, binding = 2) buffer SpatialGridBuffer { uint spatialGrid[]; };
 layout(std430, binding = 3) readonly buffer BoundsBuffer
 {
         vec4 boundsMin;
@@ -34,6 +22,24 @@ uniform float TIME;
 uniform int pointCount;
 uniform int matrixCount;
 uniform int AOgridSize;
+
+uint cellIndex(uvec3 p) {
+        uint gridSize = uint(AOgridSize);
+        return p.x + gridSize * (p.y + gridSize * p.z);
+}
+
+bool getCell(uvec3 p) {
+        uint i = cellIndex(p);
+        return (spatialGrid[i >> 5u] & (1u << (i & 31u))) != 0u;
+}
+
+void setCell(uvec3 p, bool v) {
+        uint i = cellIndex(p);
+        uint wordIndex = i >> 5u;
+        uint mask = 1u << (i & 31u);
+        if (v) atomicOr(spatialGrid[wordIndex], mask);
+        else   atomicAnd(spatialGrid[wordIndex], ~mask);
+}
 
 
 // Debug bounding-box corners and their wireframe edges.
@@ -133,8 +139,6 @@ void main()
         if(all(greaterThanEqual(gridCell, ivec3(0))) &&
            all(lessThan(gridCell, ivec3(AOgridSize))))
         {
-                uint cellIndex = uint(gridCell.x +
-                        AOgridSize * (gridCell.y + AOgridSize * gridCell.z));
-                atomicOr(spatialGrid[cellIndex], 1u);
+                setCell(uvec3(gridCell), true);
         }
 }

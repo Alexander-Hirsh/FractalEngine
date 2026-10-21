@@ -10,16 +10,17 @@
 /// ##############################################################################################
 ///                                     Render Constants
 /// ##############################################################################################
-constexpr uint64_t MAX_POINTS = 10000000;
+constexpr uint64_t MAX_POINTS = 20000000;
 constexpr int BOUNDS_DEBUG_VERTEX_COUNT = 24;
 constexpr int POINT_COMPUTE_LOCAL_SIZE = 256;
 constexpr uint64_t MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
 constexpr int AO_GRID_SIDE_SIZE = 128;
-constexpr uint64_t AO_GRID_CELL_COUNT =
-          uint64_t(AO_GRID_SIDE_SIZE) * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE;
+constexpr uint64_t AO_GRID_CELL_COUNT = uint64_t(AO_GRID_SIDE_SIZE) * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE;
+constexpr uint64_t AO_GRID_32BIT_GRID_SIZE = (AO_GRID_CELL_COUNT + 31) / 32;
+constexpr uint64_t REDUCTED_AO_GRID_32BIT = (AO_GRID_CELL_COUNT + 7) / 8;
 
-constexpr int RENDER_WIDTH = 1920/1.5;
-constexpr int RENDER_HEIGHT = 1080/1.5;
+constexpr int RENDER_WIDTH = 1920;
+constexpr int RENDER_HEIGHT = 1080;
 static_assert(MAX_POINTS <= POINT_COMPUTE_LOCAL_SIZE * MAX_COMPUTE_WORK_GROUP_COUNT_X * MAX_COMPUTE_WORK_GROUP_COUNT_X ,
               "MAX_POINTS must fit in one compute dispatch");
 
@@ -33,6 +34,7 @@ const char* BOUND_PROGRAM_NAME = "bounds_compute";
 const char* FULLSCREEN_PROGRAM_NAME = "fullscreen_quad";
 const char* DOWNSCALE_PROGRAM_NAME = "downscale";
 const char* UPSCALE_PROGRAM_NAME = "upscale";
+const char* REDUCTION_PROGRAM_NAME = "reduction";
 
 
 /// ##############################################################################################
@@ -122,10 +124,10 @@ struct IFS
 
                 for(int i = 0; i < currNumOfMatrix; i++)
                 {
-                        newScale[i] = randVec3(0.35f, 0.75f);
-                        newRotation[i] = randVec3(degToRad(-50), degToRad(50));
-                        newShear[i] = randVec3(-0.2f, 0.2f);
-                        newTranslation[i] = randVec3(0.0f, 10.0f);
+                        newScale[i] = randVec3(0.45f, 0.75f);
+                        newRotation[i] = randVec3(degToRad(-35), degToRad(35));
+                        newShear[i] = randVec3(-0.15f, 0.15f);
+                        newTranslation[i] = randVec3(0.0f, 3.0f);
                 }
         }
 
