@@ -9,6 +9,12 @@
 #include <windows.h>
 #include <wglext.h>
 
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+#include "imgui_impl_opengl3.h"
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
+           HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 /// ##############################################################################################
 ///                                     Windows Globals
@@ -17,6 +23,8 @@ static HWND window;
 static HDC dc;  
 static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT_ptr;
 
+bool platformSetupIMGUI(HWND window);
+
 
 /// ##############################################################################################
 ///				        Platform Implementations
@@ -24,6 +32,13 @@ static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT_ptr;
 LRESULT CALLBACK WindowsWindowsCallback(HWND window, UINT msg, WPARAM wParam, LPARAM lParam)
 {
         LRESULT result = 0;
+        ImGuiIO* io = ImGui::GetCurrentContext() ? &ImGui::GetIO() : nullptr;
+
+        // Pass input to ImGui first
+        if (io && ImGui_ImplWin32_WndProcHandler(window, msg, wParam, lParam))
+        {
+                return 1;
+        }
 
         switch (msg)
         {
@@ -48,19 +63,21 @@ LRESULT CALLBACK WindowsWindowsCallback(HWND window, UINT msg, WPARAM wParam, LP
         case WM_SYSKEYDOWN:
         case WM_SYSKEYUP:
         {
-                bool isDown = (msg == WM_KEYDOWN) || (msg == WM_SYSKEYDOWN);
+                if (!io || !io->WantCaptureKeyboard)
+                {
+                        bool isDown = (msg == WM_KEYDOWN) || (msg == WM_SYSKEYDOWN);
 
-                KeyCodeID keyCode = KeyCodeLookupTable[wParam];
-                Key* key = &input->keys[keyCode];
-                key->justPressed = !key->justPressed &&
-                        !key->isDown && isDown;
+                        KeyCodeID keyCode = KeyCodeLookupTable[wParam];
+                        Key* key = &input->keys[keyCode];
+                        key->justPressed = !key->justPressed &&
+                                !key->isDown && isDown;
 
-                key->justReleased = !key->justReleased &&
-                        key->isDown && !isDown;
+                        key->justReleased = !key->justReleased &&
+                                key->isDown && !isDown;
 
-                key->isDown = isDown;
-                key->halfTransitionCount++;
-
+                        key->isDown = isDown;
+                        key->halfTransitionCount++;
+                }
                 break;
         }
 
@@ -71,27 +88,30 @@ LRESULT CALLBACK WindowsWindowsCallback(HWND window, UINT msg, WPARAM wParam, LP
         case WM_RBUTTONUP:
         case WM_MBUTTONUP:
         {
-                bool isDown = (msg == WM_LBUTTONDOWN ||
-                        msg == WM_RBUTTONDOWN ||
-                        msg == WM_MBUTTONDOWN);
+                if (!io || !io->WantCaptureMouse)
+                {
+                        bool isDown = (msg == WM_LBUTTONDOWN ||
+                                msg == WM_RBUTTONDOWN ||
+                                msg == WM_MBUTTONDOWN);
 
-                int mouseCode = (msg == WM_LBUTTONDOWN ||
-                        msg == WM_LBUTTONUP) ?
-                        VK_LBUTTON : (msg == WM_MBUTTONDOWN ||
-                                msg == WM_MBUTTONUP) ?
-                        VK_MBUTTON : VK_RBUTTON;
+                        int mouseCode = (msg == WM_LBUTTONDOWN ||
+                                msg == WM_LBUTTONUP) ?
+                                VK_LBUTTON : (msg == WM_MBUTTONDOWN ||
+                                        msg == WM_MBUTTONUP) ?
+                                VK_MBUTTON : VK_RBUTTON;
 
-                KeyCodeID keyCode = KeyCodeLookupTable[mouseCode];
+                        KeyCodeID keyCode = KeyCodeLookupTable[mouseCode];
 
-                Key* key = &input->keys[keyCode];
-                key->justPressed = !key->justPressed &&
-                        !key->isDown && isDown;
+                        Key* key = &input->keys[keyCode];
+                        key->justPressed = !key->justPressed &&
+                                !key->isDown && isDown;
 
-                key->justReleased = !key->justReleased &&
-                        key->isDown && !isDown;
+                        key->justReleased = !key->justReleased &&
+                                key->isDown && !isDown;
 
-                key->isDown = isDown;
-                key->halfTransitionCount++;
+                        key->isDown = isDown;
+                        key->halfTransitionCount++;
+                }
 
                 break;
         }
@@ -311,6 +331,12 @@ bool platformCreateWindow(int width, int height, const wchar_t* title)
                 }
         }
 
+        if(!platformSetupIMGUI(window))
+        {
+                SM_ASSERT(false, "Failed to initialize ImGui");
+                return false;
+        }
+
         ShowWindow(window, SW_SHOW);
 
         return true;
@@ -354,6 +380,36 @@ void platformSwapBuffers()
 {
         SwapBuffers(dc);
 }
+
+
+bool platformSetupIMGUI(HWND window)
+{
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+        // Choose a built-in theme.
+        ImGui::StyleColorsClassic();
+
+        // Initialize the Win32 and OpenGL backends.
+        if(!ImGui_ImplWin32_Init(window))
+        {
+                ImGui::DestroyContext();
+                return false;
+        }
+
+        if(!ImGui_ImplOpenGL3_Init("#version 430"))
+        {
+                ImGui_ImplWin32_Shutdown();
+                ImGui::DestroyContext();
+                return false;
+        }
+
+        return true;
+}
+
 
 void* platformLoadGlFunction(const char* name)
 {

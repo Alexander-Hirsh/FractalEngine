@@ -7,10 +7,11 @@
 #include "math_lib.h"
 
 
+
 /// ##############################################################################################
 ///                                     Render Constants
 /// ##############################################################################################
-constexpr uint64_t MAX_POINTS = 20000000;
+constexpr uint64_t MAX_POINTS = 25000000;
 constexpr int BOUNDS_DEBUG_VERTEX_COUNT = 24;
 constexpr int POINT_COMPUTE_LOCAL_SIZE = 256;
 constexpr uint64_t MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
@@ -99,6 +100,27 @@ struct bloomMip
 /// ##############################################################################################
 ///                                     Simulation Structs
 /// ##############################################################################################
+struct PARAMETERS
+{
+        vec4 lightColor = vec4(1.0, 1.0, 1.0, 1.0);
+        vec4 shadowColor = vec4(0.0, 0.0, 0.0, 1.0);
+        float shadowThreshold = 0.985;
+
+        vec2 scaleBounds = vec2(0.45f, 0.75f);
+        vec2 rotationBounds = vec2(-35.0f, 35.0f);
+        vec2 shearBounds = vec2(-0.15f, 0.15f);
+        vec2 translationBounds = vec2(0.0f, 3.0f);
+
+        bool useKuwahara = false;
+        bool useBloom = false;
+        float bloomStrength = 0.25f;
+
+        float timeToChange = 3.0f;
+        float iCurve = 0.5995f;
+
+        bool pause = false;
+};
+
 struct IFS
 {
         int currNumOfMatrix = 0;
@@ -118,31 +140,40 @@ struct IFS
 
         float iCurve = 0.5995f;
 
-        void generateNewParameters()
+        void generateNewParameters(PARAMETERS params)
         {
                 currNumOfMatrix = maxNumOfMatrix;//(int)(rng_f() * (maxNumOfMatrix - 1)) + 3;
+                iCurve = params.iCurve;
 
                 for(int i = 0; i < currNumOfMatrix; i++)
                 {
-                        newScale[i] = randVec3(0.45f, 0.75f);
-                        newRotation[i] = randVec3(degToRad(-35), degToRad(35));
-                        newShear[i] = randVec3(-0.15f, 0.15f);
-                        newTranslation[i] = randVec3(0.0f, 3.0f);
+                        newScale[i] = randVec3(params.scaleBounds.x, params.scaleBounds.y);
+                        newRotation[i] = randVec3(degToRad(params.rotationBounds.x), degToRad(params.rotationBounds.y));
+                        newShear[i] = randVec3(params.shearBounds.x, params.shearBounds.y);
+                        newTranslation[i] = randVec3(params.translationBounds.x, params.translationBounds.y);
                 }
         }
 
-        void generateTransformMatrix(float dt)
+        // newScale[i] = randVec3(0.45f, 0.75f);
+        // newRotation[i] = randVec3(degToRad(-35), degToRad(35));
+        // newShear[i] = randVec3(-0.15f, 0.15f);
+        // newTranslation[i] = randVec3(0.0f, 3.0f);
+
+        void generateTransformMatrix(bool pause, float dt)
         {
                 for(int i = 0; i < currNumOfMatrix; i++)
                 {
-                        vec3Lerp(currScale[i], newScale[i], iCurve, dt);
-                        vec3Lerp(currRotation[i], newRotation[i], iCurve, dt);
-                        vec3Lerp(currShear[i], newShear[i], iCurve, dt);
-                        vec3Lerp(currTranslation[i], newTranslation[i], iCurve, dt);
+                        if(!pause)
+                        {
+                                vec3Lerp(currScale[i], newScale[i], iCurve, dt);
+                                vec3Lerp(currRotation[i], newRotation[i], iCurve, dt);
+                                vec3Lerp(currShear[i], newShear[i], iCurve, dt);
+                                vec3Lerp(currTranslation[i], newTranslation[i], iCurve, dt);
+                        }
 
                         IFSMatrices[i] = translationMatrix(currTranslation[i]) *
-                                         rotationMatrix(currRotation[i])    *
-                                         shearMatrix(currShear[i])          *
+                                         rotationMatrix(currRotation[i])       *
+                                         shearMatrix(currShear[i])             *
                                          scaleMatrix(currScale[i]);
                 }
         }

@@ -596,6 +596,28 @@ vec3 cross(vec3 a, vec3 b)
                 a.x * b.y - a.y * b.x};
 }
 
+template <int X, int Y>
+struct vec4Swizzle2
+{
+        float values[4];
+
+        operator vec2() const
+        {
+                return { values[X], values[Y] };
+        }
+};
+
+template <int X, int Y, int Z>
+struct vec4Swizzle3
+{
+        float values[4];
+
+        operator vec3() const
+        {
+                return { values[X], values[Y], values[Z] };
+        }
+};
+
 struct vec4
 {
         union
@@ -616,7 +638,96 @@ struct vec4
                         float b;
                         float a;
                 };
+
+#define VEC4_SWIZZLE2(name, x, y) vec4Swizzle2<x, y> name
+                VEC4_SWIZZLE2(xx, 0, 0);
+                VEC4_SWIZZLE2(xy, 0, 1);
+                VEC4_SWIZZLE2(xz, 0, 2);
+                VEC4_SWIZZLE2(xw, 0, 3);
+                VEC4_SWIZZLE2(yx, 1, 0);
+                VEC4_SWIZZLE2(yy, 1, 1);
+                VEC4_SWIZZLE2(yz, 1, 2);
+                VEC4_SWIZZLE2(yw, 1, 3);
+                VEC4_SWIZZLE2(zx, 2, 0);
+                VEC4_SWIZZLE2(zy, 2, 1);
+                VEC4_SWIZZLE2(zz, 2, 2);
+                VEC4_SWIZZLE2(zw, 2, 3);
+                VEC4_SWIZZLE2(wx, 3, 0);
+                VEC4_SWIZZLE2(wy, 3, 1);
+                VEC4_SWIZZLE2(wz, 3, 2);
+                VEC4_SWIZZLE2(ww, 3, 3);
+#undef VEC4_SWIZZLE2
+
+#define VEC4_SWIZZLE3(name, x, y, z) vec4Swizzle3<x, y, z> name
+                VEC4_SWIZZLE3(xxx, 0, 0, 0);
+                VEC4_SWIZZLE3(xxy, 0, 0, 1);
+                VEC4_SWIZZLE3(xxz, 0, 0, 2);
+                VEC4_SWIZZLE3(xxw, 0, 0, 3);
+                VEC4_SWIZZLE3(xyx, 0, 1, 0);
+                VEC4_SWIZZLE3(xyy, 0, 1, 1);
+                VEC4_SWIZZLE3(xyz, 0, 1, 2);
+                VEC4_SWIZZLE3(xyw, 0, 1, 3);
+                VEC4_SWIZZLE3(xzx, 0, 2, 0);
+                VEC4_SWIZZLE3(xzy, 0, 2, 1);
+                VEC4_SWIZZLE3(xzz, 0, 2, 2);
+                VEC4_SWIZZLE3(xzw, 0, 2, 3);
+                VEC4_SWIZZLE3(xwx, 0, 3, 0);
+                VEC4_SWIZZLE3(xwy, 0, 3, 1);
+                VEC4_SWIZZLE3(xwz, 0, 3, 2);
+                VEC4_SWIZZLE3(xww, 0, 3, 3);
+                VEC4_SWIZZLE3(yxx, 1, 0, 0);
+                VEC4_SWIZZLE3(yxy, 1, 0, 1);
+                VEC4_SWIZZLE3(yxz, 1, 0, 2);
+                VEC4_SWIZZLE3(yxw, 1, 0, 3);
+                VEC4_SWIZZLE3(yyx, 1, 1, 0);
+                VEC4_SWIZZLE3(yyy, 1, 1, 1);
+                VEC4_SWIZZLE3(yyz, 1, 1, 2);
+                VEC4_SWIZZLE3(yyw, 1, 1, 3);
+                VEC4_SWIZZLE3(yzx, 1, 2, 0);
+                VEC4_SWIZZLE3(yzy, 1, 2, 1);
+                VEC4_SWIZZLE3(yzz, 1, 2, 2);
+                VEC4_SWIZZLE3(yzw, 1, 2, 3);
+                VEC4_SWIZZLE3(ywx, 1, 3, 0);
+                VEC4_SWIZZLE3(ywy, 1, 3, 1);
+                VEC4_SWIZZLE3(ywz, 1, 3, 2);
+                VEC4_SWIZZLE3(yww, 1, 3, 3);
+                VEC4_SWIZZLE3(zxx, 2, 0, 0);
+                VEC4_SWIZZLE3(zxy, 2, 0, 1);
+                VEC4_SWIZZLE3(zxz, 2, 0, 2);
+                VEC4_SWIZZLE3(zxw, 2, 0, 3);
+                VEC4_SWIZZLE3(zyx, 2, 1, 0);
+                VEC4_SWIZZLE3(zyy, 2, 1, 1);
+                VEC4_SWIZZLE3(zyz, 2, 1, 2);
+                VEC4_SWIZZLE3(zyw, 2, 1, 3);
+                VEC4_SWIZZLE3(zzx, 2, 2, 0);
+                VEC4_SWIZZLE3(zzy, 2, 2, 1);
+                VEC4_SWIZZLE3(zzz, 2, 2, 2);
+                VEC4_SWIZZLE3(zzw, 2, 2, 3);
+                VEC4_SWIZZLE3(zwx, 2, 3, 0);
+                VEC4_SWIZZLE3(zwy, 2, 3, 1);
+                VEC4_SWIZZLE3(zwz, 2, 3, 2);
+                VEC4_SWIZZLE3(zww, 2, 3, 3);
+                VEC4_SWIZZLE3(wxx, 3, 0, 0);
+                VEC4_SWIZZLE3(wxy, 3, 0, 1);
+                VEC4_SWIZZLE3(wxz, 3, 0, 2);
+                VEC4_SWIZZLE3(wxw, 3, 0, 3);
+                VEC4_SWIZZLE3(wyx, 3, 1, 0);
+                VEC4_SWIZZLE3(wyy, 3, 1, 1);
+                VEC4_SWIZZLE3(wyz, 3, 1, 2);
+                VEC4_SWIZZLE3(wyw, 3, 1, 3);
+                VEC4_SWIZZLE3(wzx, 3, 2, 0);
+                VEC4_SWIZZLE3(wzy, 3, 2, 1);
+                VEC4_SWIZZLE3(wzz, 3, 2, 2);
+                VEC4_SWIZZLE3(wzw, 3, 2, 3);
+                VEC4_SWIZZLE3(wwx, 3, 3, 0);
+                VEC4_SWIZZLE3(wwy, 3, 3, 1);
+                VEC4_SWIZZLE3(wwz, 3, 3, 2);
+                VEC4_SWIZZLE3(www, 3, 3, 3);
+#undef VEC4_SWIZZLE3
         };
+
+        vec4() : values{} {}
+        vec4(float x, float y, float z, float w) : values{ x, y, z, w } {}
 
         float& operator[](int idx)
         {
@@ -631,6 +742,11 @@ struct vec4
         bool operator==(vec4 other)
         {
                 return x == other.x && y == other.y && z == other.z && w == other.w;
+        }
+
+        vec4 operator+(const vec4& other) const
+        {
+                return { x + other.x, y + other.y, z + other.z, w + other.w };
         }
 
         vec4& operator+=(const vec4& other)

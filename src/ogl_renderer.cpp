@@ -2,18 +2,17 @@
 
 #include "render_interface.h"
 
-
 /// ##############################################################################################
 ///                                     OpenGL Structs
 /// ##############################################################################################
 struct GLContext
 {
         // Programs
-        GLuint pointProgramID;
-        GLuint computeProgramID;
-        GLuint voxelProgramID;
-        GLuint boundsProgramID;
-        GLuint fullscreenProgramID;
+        GLuint pointProgramID;          // Draws point cloud approximation
+        GLuint computeProgramID;        // Computes IFS points positions
+        GLuint voxelProgramID;          // Displays IFS AO grid occupation
+        GLuint boundsProgramID;         // Computes IFS bounds
+        GLuint fullscreenProgramID;     // Post process program
         GLuint downscaleProgramID;      // Downscaler for blur textures
         GLuint upscaleProgramID;        // Upscaler for blur textures
         GLuint reductionProgramID;      // Precomputes AO grid for sampling
@@ -60,6 +59,15 @@ struct GLContext
         // Texture IDs
         GLuint framebufferTextureID;
         std::vector<bloomMip> bloomMipChain;
+
+        // Parameter uniforms
+        GLuint lightColor;
+        GLuint shadowColor;
+        GLuint shadowThreshold;
+        GLint useKuwahara;
+        GLint useBloom;
+        GLuint bloomStrength;
+
 };
 
 
@@ -68,7 +76,6 @@ struct GLContext
 /// ##############################################################################################
 static GLContext glContext;
 static const uint32_t emptyAOGrid[AO_GRID_32BIT_GRID_SIZE] = {};
-
 
 /// ##############################################################################################
 ///                                     OpenGL Functions
@@ -223,7 +230,7 @@ bool glInit(BumpAllocator* transientStorage)
 
 
         
-        // INIT POINT BUFFER TO COMPUTE SHADER TO WORK ON
+        // CONFIGURE POINT BUFFER TO COMPUTE SHADER TO WORK ON
         {
                 glGenBuffers(1, &glContext.pointBufferID);
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.pointBufferID);
@@ -240,7 +247,7 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, glContext.pointBufferID);
         }
 
-        // INIT TRANSFORM MATRICES TO COMPUTE SHADER
+        // CONFIGURE TRANSFORM MATRICES TO COMPUTE SHADER
         {
                 glGenBuffers(1, &glContext.matrixBufferID);
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, glContext.matrixBufferID);
@@ -249,7 +256,7 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, glContext.matrixBufferID);
         }
 
-        // INIT AMBIENT OCCLUSION GRIDS FOR LIGHTING
+        // CONFIGURE AMBIENT OCCLUSION GRIDS FOR LIGHTING
         {
                 // Regular grid
                 glGenBuffers(1, &glContext.AOgridBufferID);
@@ -266,7 +273,7 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, glContext.sortedAOGridBufferID);
         }
 
-        // INIT AABB BOUNDS BUFFER
+        // CONFIGURE AABB BOUNDS BUFFER
         {
                 struct BoundsGPU
                 {
@@ -282,7 +289,7 @@ bool glInit(BumpAllocator* transientStorage)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, glContext.boundsBufferID);
         }
 
-        // INIT FRAMEBUFFER OBJECT
+        // CONFIGURE FRAMEBUFFER OBJECT
         {
                 glGenFramebuffers(1, &glContext.FBOID);
                 glBindFramebuffer(GL_FRAMEBUFFER, glContext.FBOID);
@@ -311,7 +318,7 @@ bool glInit(BumpAllocator* transientStorage)
                           "Framebuffer ERROR: status 0x%X", framebufferStatus);
         }
 
-        // INIT BLOOM FRAMEBUFFER OBJECT
+        // CONFIGURE BLOOM FRAMEBUFFER OBJECT
         {
                 glGenFramebuffers(1, &glContext.bloomFBOID);
                 glBindFramebuffer(GL_FRAMEBUFFER, glContext.bloomFBOID);
@@ -378,6 +385,13 @@ bool glInit(BumpAllocator* transientStorage)
 
         glContext.reductionAOgridSizeID = glGetUniformLocation(glContext.reductionProgramID, "gridSize");
 
+        // Parameter uniforms
+        glContext.lightColor = glGetUniformLocation(glContext.pointProgramID, "lightColor");
+        glContext.shadowColor = glGetUniformLocation(glContext.pointProgramID, "shadowColor");
+        glContext.shadowThreshold = glGetUniformLocation(glContext.pointProgramID, "shadowThreshold");
+        glContext.useKuwahara = glGetUniformLocation(glContext.fullscreenProgramID, "useKuwahara");
+        glContext.useBloom = glGetUniformLocation(glContext.fullscreenProgramID, "useBloom");
+        glContext.bloomStrength = glGetUniformLocation(glContext.fullscreenProgramID, "bloomStrength");
 
         glEnable(GL_FRAMEBUFFER_SRGB);
         // glEnable(GL_PROGRAM_POINT_SIZE);
@@ -385,7 +399,7 @@ bool glInit(BumpAllocator* transientStorage)
         return true;
 }
 
-void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float timeSeconds)
+void glRender(BumpAllocator* transientStorage, IFS& ifs, PARAMETERS params, float deltaTime, float timeSeconds)
 {
         
         if(renderData->pointCount < 0 || renderData->pointCount > MAX_POINTS)
@@ -394,9 +408,6 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                         renderData->pointCount, MAX_POINTS);
                 return;
         }
-
-        // Update matricies
-        ifs.generateTransformMatrix(deltaTime);
 
         Camera3D& camera = renderData->gameCamera;
 
@@ -481,6 +492,9 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 
                 glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, &cameraSpaceTransform.ax);
                 glUniform1i(glContext.vertexAOgridSizeID, AO_GRID_SIDE_SIZE);
+                glUniform4fv(glContext.lightColor, 1, params.lightColor.values);
+                glUniform4fv(glContext.shadowColor, 1, params.shadowColor.values);
+                glUniform1f(glContext.shadowThreshold, params.shadowThreshold);
 
                 glBindVertexArray(glContext.pointVertexArrayID);
                 glDrawArrays(GL_POINTS, 0, renderData->pointCount);
@@ -547,6 +561,10 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, float deltaTime, float 
                 glUseProgram(glContext.fullscreenProgramID);
                 glUniform1i(glContext.pp_framebufferTextureID, 0);
                 glUniform1i(glContext.pp_bloomTextureID, 1);
+
+                glUniform1i(glContext.useKuwahara, params.useKuwahara);
+                glUniform1i(glContext.useBloom, params.useBloom);
+                glUniform1f(glContext.bloomStrength, params.bloomStrength);
 
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 glViewport(0, 0, input->screenSize.x, input->screenSize.y);

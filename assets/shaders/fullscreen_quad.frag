@@ -6,6 +6,10 @@ in vec2 texCoords;
 uniform sampler2D screenTex;
 uniform sampler2D bloomTex;
 
+uniform bool useKuwahara;
+uniform bool useBloom;
+uniform float bloomStrength;
+
 const int ANISOTROPIC_RADIUS = 2;
 const int ANISOTROPIC_SECTORS = 8;
 const float PI = 3.14159265359;
@@ -207,9 +211,12 @@ void main()
 
 
         const float gamma = 1.1;
-        const float bloomStrength = 0.25;
-        //vec3 sceneColor = bestColor.rgb;
-        vec3 sceneColor = anisotropicKuwahara(texel, ivec2(screenSize));
+
+        vec3 sceneColor = useKuwahara ? anisotropicKuwahara(texel, ivec2(screenSize)) :
+                          texture(screenTex, texCoords).rgb;
+
         vec3 bloomColor = texture(bloomTex, texCoords).rgb;
-        fragColor = vec4(pow(mix(sceneColor, bloomColor, bloomStrength), vec3(1.0/gamma)), 1.0);
+
+        if(useBloom) fragColor = vec4(pow(mix(sceneColor, bloomColor, bloomStrength), vec3(1.0/gamma)), 1.0);
+        else fragColor = vec4(sceneColor, 1.0);
 }

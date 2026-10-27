@@ -6,6 +6,10 @@ layout (location = 3) flat in int numCellAround;
 // Outputs
 layout (location = 0) out vec4 fragColor;
 
+uniform vec4 lightColor;
+uniform vec4 shadowColor;
+uniform float shadowThreshold; // 0.985
+
 void main()
 {
         // vec2 pointCoord = gl_PointCoord * 2.0 - 1.0;
@@ -15,6 +19,6 @@ void main()
         vec4 color1 = vec4(240.0/255.0, 143.0/255.0, 34.0/255.0, 1.0);
 
         float occlusion = float(numCellAround) / 27.0;
-        float shade = 1.0 - 0.985 * occlusion;
-        fragColor = vec4(mix(color0, color1, shade));
+        float shade = 1.0 - shadowThreshold * occlusion;
+        fragColor = vec4(mix(shadowColor, lightColor, shade));
 }
