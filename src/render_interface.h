@@ -6,6 +6,8 @@
 #include "assets.h"
 #include "math_lib.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 
 /// ##############################################################################################
@@ -15,7 +17,7 @@ constexpr uint64_t MAX_POINTS = 4000000;
 constexpr int BOUNDS_DEBUG_VERTEX_COUNT = 24;
 constexpr int POINT_COMPUTE_LOCAL_SIZE = 256;
 constexpr uint64_t MAX_COMPUTE_WORK_GROUP_COUNT_X = 65535;
-constexpr int AO_GRID_SIDE_SIZE = 128;
+constexpr int AO_GRID_SIDE_SIZE = 256;
 constexpr uint64_t AO_GRID_CELL_COUNT = uint64_t(AO_GRID_SIDE_SIZE) * AO_GRID_SIDE_SIZE * AO_GRID_SIDE_SIZE;
 constexpr uint64_t AO_GRID_32BIT_GRID_SIZE = (AO_GRID_CELL_COUNT + 31) / 32;
 constexpr uint64_t REDUCTED_AO_GRID_32BIT = (AO_GRID_CELL_COUNT + 7) / 8;
@@ -46,7 +48,7 @@ struct Camera3D
         vec3 position;
         float yaw = 0.0f;
         float pitch = 0.0f;
-        float distance = 1.5f;
+        float distance = 1.0f;
 
         vec3 fpoint = vec3(0.0, 0.0, 0.0);
         vec3 forward, right, up;
@@ -120,6 +122,10 @@ struct PARAMETERS
         bool pause = false;
 
         int dispatches = 1;
+        int screenshotDispatches = 500;
+        int AOgridSize = 256;
+
+        bool hideGUI = false;
 };
 
 struct IFS

@@ -84,8 +84,9 @@ static const uint32_t emptyAOGrid[AO_GRID_32BIT_GRID_SIZE] = {};
 static void APIENTRY glDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity,
                                        GLsizei length, const GLchar* message, const void* user)
 {
-        if(severity == GL_DEBUG_SEVERITY_LOW || 
-        severity == GL_DEBUG_SEVERITY_MEDIUM ||
+        if(
+        //severity == GL_DEBUG_SEVERITY_LOW || 
+        // severity == GL_DEBUG_SEVERITY_MEDIUM ||
         severity == GL_DEBUG_SEVERITY_HIGH)
         {
                 SM_ASSERT(false, "OpenGL Error: %s", message);
@@ -568,4 +569,18 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, PARAMETERS params, floa
                 glBindTexture(GL_TEXTURE_2D, glContext.bloomMipChain[0].texture);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
+}
+
+void takeScreenshot(GLuint FBOID, std::string timestamp)
+{
+        std::vector<unsigned char> pixels(RENDER_WIDTH * RENDER_HEIGHT * 4);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);   // the RGBA8 one
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, RENDER_WIDTH, RENDER_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // OpenGL's origin is bottom-left, PNG's is top-left
+        stbi_flip_vertically_on_write(1);
+        std::string fileName = "screenshots/" + timestamp + "capture.png";
+        stbi_write_png(fileName.c_str(), RENDER_WIDTH, RENDER_HEIGHT, 4, pixels.data(), RENDER_WIDTH * 4);
 }

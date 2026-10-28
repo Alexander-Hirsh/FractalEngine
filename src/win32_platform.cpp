@@ -63,7 +63,7 @@ LRESULT CALLBACK WindowsWindowsCallback(HWND window, UINT msg, WPARAM wParam, LP
         case WM_SYSKEYDOWN:
         case WM_SYSKEYUP:
         {
-                if (!io || !io->WantCaptureKeyboard)
+                if (/*!io || !io->WantCaptureKeyboard*/true)
                 {
                         bool isDown = (msg == WM_KEYDOWN) || (msg == WM_SYSKEYDOWN);
 
