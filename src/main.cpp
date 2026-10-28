@@ -173,8 +173,11 @@ void drawParameterGUI(PARAMETERS& params, IFS& ifs)
 
         ImGui::Text("Hello! \nSpace: Pause\nH: Hide interface");
         ImGui::Text("FPS | C:%f | N:%f | X:%f", fpsCapped, minFps, maxFps);
-        ImGui::Text("Particles: %i M", int(MAX_POINTS/1000000));
+        ImGui::Text("Particles: %i M over %i dispatches", int(MAX_POINTS/1000000), int(params.dispatches));
         ImGui::Text("MS | %f", 1.0 / deltaTime);
+
+        ImGui::SeparatorText("Particles");
+        ImGui::SliderInt("Particle Dispatches", &params.dispatches, 1, 100);
 
         ImGui::SeparatorText("Buttons");
 

@@ -38,6 +38,7 @@ struct GLContext
         GLuint computePointCountID;
         GLuint computeMatrixCountID;
         GLuint computeAOgridSizeID;
+        GLuint dispatchID;
 
         // Reduction uniforms
         GLuint reductionAOgridSizeID;
@@ -209,7 +210,6 @@ bool glInit(BumpAllocator* transientStorage)
 
         glContext.pointProgramID      = glCreateShaderProgram (transientStorage, POINT_PROGRAM_NAME);
         glContext.computeProgramID    = glCreateComputeProgram(transientStorage, IFS_PROGRAM_NAME);
-        glContext.voxelProgramID      = glCreateShaderProgram (transientStorage, VOXEL_PROGRAM_NAME);
         glContext.boundsProgramID     = glCreateComputeProgram(transientStorage, BOUND_PROGRAM_NAME);
         glContext.fullscreenProgramID = glCreateShaderProgram (transientStorage, FULLSCREEN_PROGRAM_NAME);
         glContext.downscaleProgramID  = glCreateShaderProgram (transientStorage, FULLSCREEN_PROGRAM_NAME, DOWNSCALE_PROGRAM_NAME);
@@ -218,7 +218,6 @@ bool glInit(BumpAllocator* transientStorage)
 
         if(!glContext.pointProgramID       || 
            !glContext.computeProgramID     ||
-           !glContext.voxelProgramID       ||
            !glContext.boundsProgramID      ||
            !glContext.fullscreenProgramID  ||
            !glContext.downscaleProgramID   ||
@@ -364,6 +363,7 @@ bool glInit(BumpAllocator* transientStorage)
         glContext.computePointCountID = glGetUniformLocation(glContext.computeProgramID, "pointCount");
         glContext.computeMatrixCountID = glGetUniformLocation(glContext.computeProgramID, "matrixCount");
         glContext.computeAOgridSizeID = glGetUniformLocation(glContext.computeProgramID, "AOgridSize");
+        glContext.dispatchID = glGetUniformLocation(glContext.computeProgramID, "dispatchID");
 
         // Point cloud uniforms
         glContext.projectionID = glGetUniformLocation(glContext.pointProgramID, "cameraSpaceTransform");
@@ -371,9 +371,6 @@ bool glInit(BumpAllocator* transientStorage)
 
         // Bounds compute uniforms
         glContext.boundsMatrixCountID = glGetUniformLocation(glContext.boundsProgramID, "matrixCount");
-
-        // Voxel debug uniforms
-        glContext.vd_projectMatID = glGetUniformLocation(glContext.voxelProgramID, "projectionMatrix");
 
         // Post processing uniforms
         glContext.pp_framebufferTextureID = glGetUniformLocation(glContext.fullscreenProgramID, "screenTex");
@@ -452,53 +449,49 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, PARAMETERS params, floa
                 glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
 
-        // Compute point cloud positions
-        {        
-                glUseProgram(glContext.computeProgramID);
-                glUniform1i(glContext.computePointCountID, renderData->pointCount);
-                glUniform1f(glContext.computeTimeID, timeSeconds);
-                glUniform1i(glContext.computeMatrixCountID, ifs.currNumOfMatrix);
-                glUniform1i(glContext.computeAOgridSizeID, AO_GRID_SIDE_SIZE);
-
-                GLuint workGroupCount = (renderData->pointCount + POINT_COMPUTE_LOCAL_SIZE - 1) /
-                                                        POINT_COMPUTE_LOCAL_SIZE;
-
-                glDispatchCompute(workGroupCount, 1, 1);
-
-                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        }
-
-        // Use reduction program to precompute grid neighbors
+        for(int d = 0; d < params.dispatches; d++)
         {
-                glUseProgram(glContext.reductionProgramID);
-                glUniform1i(glContext.reductionAOgridSizeID, AO_GRID_SIDE_SIZE);
+                // Compute point cloud positions
+                {        
+                        glUseProgram(glContext.computeProgramID);
+                        glUniform1i(glContext.computePointCountID, renderData->pointCount);
+                        glUniform1f(glContext.computeTimeID, timeSeconds);
+                        glUniform1i(glContext.computeMatrixCountID, ifs.currNumOfMatrix);
+                        glUniform1i(glContext.computeAOgridSizeID, AO_GRID_SIDE_SIZE);
+                        glUniform1i(glContext.dispatchID, d);
 
-                glDispatchCompute(AO_GRID_SIDE_SIZE / 32 / 4, AO_GRID_SIDE_SIZE / 8, AO_GRID_SIDE_SIZE / 8);   // = (1, 16, 16)
-                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        }
+                        GLuint workGroupCount = (renderData->pointCount + POINT_COMPUTE_LOCAL_SIZE - 1) /
+                                                                POINT_COMPUTE_LOCAL_SIZE;
 
-        // Draw Debug voxel grid
-        {
-                //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                glUseProgram(glContext.voxelProgramID);
+                        glDispatchCompute(workGroupCount, 1, 1);
 
-                glUniformMatrix4fv(glContext.vd_projectMatID, 1, GL_FALSE, &cameraSpaceTransform.ax);
-                //glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+                        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                }
 
-        // Use point cloud program to draw computed points
-        {        
-                glUseProgram(glContext.pointProgramID);
-                
-                glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, &cameraSpaceTransform.ax);
-                glUniform1i(glContext.vertexAOgridSizeID, AO_GRID_SIDE_SIZE);
-                glUniform4fv(glContext.lightColor, 1, params.lightColor.values);
-                glUniform4fv(glContext.shadowColor, 1, params.shadowColor.values);
-                glUniform1f(glContext.shadowThreshold, params.shadowThreshold);
+                // Use reduction program to precompute grid neighbors
+                if(d == 0) // Compute bounds only on first dispatch
+                {
+                        glUseProgram(glContext.reductionProgramID);
+                        glUniform1i(glContext.reductionAOgridSizeID, AO_GRID_SIDE_SIZE);
 
-                glBindVertexArray(glContext.pointVertexArrayID);
-                glDrawArrays(GL_POINTS, 0, renderData->pointCount);
-                glDrawArrays(GL_LINES, renderData->pointCount, BOUNDS_DEBUG_VERTEX_COUNT);
+                        glDispatchCompute(AO_GRID_SIDE_SIZE / 32 / 4, AO_GRID_SIDE_SIZE / 8, AO_GRID_SIDE_SIZE / 8);   // = (1, 16, 16)
+                        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                }
+
+                // Use point cloud program to draw computed points
+                {        
+                        glUseProgram(glContext.pointProgramID);
+                        
+                        glUniformMatrix4fv(glContext.projectionID, 1, GL_FALSE, &cameraSpaceTransform.ax);
+                        glUniform1i(glContext.vertexAOgridSizeID, AO_GRID_SIDE_SIZE);
+                        glUniform4fv(glContext.lightColor, 1, params.lightColor.values);
+                        glUniform4fv(glContext.shadowColor, 1, params.shadowColor.values);
+                        glUniform1f(glContext.shadowThreshold, params.shadowThreshold);
+
+                        glBindVertexArray(glContext.pointVertexArrayID);
+                        glDrawArrays(GL_POINTS, 0, renderData->pointCount);
+                        glDrawArrays(GL_LINES, renderData->pointCount, BOUNDS_DEBUG_VERTEX_COUNT);
+                }
         }
 
         // Downsample the complete HDR scene into the bloom mip chain.

@@ -22,6 +22,7 @@ uniform float TIME;
 uniform int pointCount;
 uniform int matrixCount;
 uniform int AOgridSize;
+uniform int dispatchID;
 
 uint cellIndex(uvec3 p) {
         uint gridSize = uint(AOgridSize);
@@ -93,7 +94,7 @@ void main()
         vec4 point = points[pID];
 
         // Get random matrix index
-        uint seed = pID ^ (frame * 0x9e3779b9u) ^ (0x85ebca6bu);
+        uint seed = pID ^ (frame * 0x9e3779b9u) ^ (0x85ebca6bu) ^ (dispatchID* 0x9e3779b9u);
         uint matrixIndex = lowbias32(seed) % uint(matrixCount);
 
         // Map the attractor box into the grid's [-0.5, 0.5] coordinate range.
