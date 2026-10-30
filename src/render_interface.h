@@ -115,6 +115,7 @@ struct PARAMETERS
         bool useKuwahara = false;
         bool useBloom = false;
         float bloomStrength = 0.25f;
+        float gamma = 1.1f;
 
         float timeToChange = 3.0f;
         float iCurve = 0.5995f;

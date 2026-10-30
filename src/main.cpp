@@ -218,7 +218,7 @@ void drawParameterGUI(PARAMETERS& params, IFS& ifs)
 
         ImGui::ColorEdit4("Light color", (float*)&params.lightColor, ImGuiColorEditFlags_PickerHueWheel);
         ImGui::ColorEdit4("Shadow color", (float*)&params.shadowColor, ImGuiColorEditFlags_PickerHueWheel);
-        ImGui::SliderFloat("Shadow threshold", &params.shadowThreshold, 0.0f, 1.0f);
+        ImGui::SliderFloat("Shadow threshold", &params.shadowThreshold, 0.0f, 3.0f);
 
         ImGui::SeparatorText("Bounds");
         ImGui::Text("Min and Max values that can be generated for each transformation");
@@ -234,6 +234,7 @@ void drawParameterGUI(PARAMETERS& params, IFS& ifs)
         ImGui::Checkbox("Use Bloom", &params.useBloom);
         ImGui::SetItemTooltip("You want some bloom? This thing does some bloom");
         ImGui::SliderFloat("Bloom Strength", &params.bloomStrength, 0.01f, 1.0f);
+        ImGui::SliderFloat("Gamma", &params.gamma, 0.0f, 3.0f);
 
         ImGui::End();
 }

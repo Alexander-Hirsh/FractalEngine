@@ -68,6 +68,7 @@ struct GLContext
         GLint useKuwahara;
         GLint useBloom;
         GLuint bloomStrength;
+        GLuint gamma;
 
 };
 
@@ -390,6 +391,7 @@ bool glInit(BumpAllocator* transientStorage)
         glContext.useKuwahara = glGetUniformLocation(glContext.fullscreenProgramID, "useKuwahara");
         glContext.useBloom = glGetUniformLocation(glContext.fullscreenProgramID, "useBloom");
         glContext.bloomStrength = glGetUniformLocation(glContext.fullscreenProgramID, "bloomStrength");
+        glContext.gamma = glGetUniformLocation(glContext.fullscreenProgramID, "gamma");
 
         glEnable(GL_FRAMEBUFFER_SRGB);
         // glEnable(GL_PROGRAM_POINT_SIZE);
@@ -559,6 +561,7 @@ void glRender(BumpAllocator* transientStorage, IFS& ifs, PARAMETERS params, floa
                 glUniform1i(glContext.useKuwahara, params.useKuwahara);
                 glUniform1i(glContext.useBloom, params.useBloom);
                 glUniform1f(glContext.bloomStrength, params.bloomStrength);
+                glUniform1f(glContext.gamma, params.gamma);
 
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 glViewport(0, 0, input->screenSize.x, input->screenSize.y);

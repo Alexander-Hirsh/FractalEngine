@@ -9,6 +9,7 @@ uniform sampler2D bloomTex;
 uniform bool useKuwahara;
 uniform bool useBloom;
 uniform float bloomStrength;
+uniform float gamma;
 
 const int ANISOTROPIC_RADIUS = 2;
 const int ANISOTROPIC_SECTORS = 8;
@@ -208,9 +209,6 @@ void main()
         //                 bestColor = mean;
         //         }
         // }
-
-
-        const float gamma = 1.1;
 
         vec3 sceneColor = useKuwahara ? anisotropicKuwahara(texel, ivec2(screenSize)) :
                           texture(screenTex, texCoords).rgb;
